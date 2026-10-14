@@ -3,7 +3,8 @@
 //  leanring-buddy
 //
 //  Common surface for text-to-speech backends so CompanionManager can swap
-//  between ElevenLabs (cloud) and Apple's on-device synthesizer.
+//  between Kokoro (on-device, default), Apple's on-device synthesizer, and
+//  ElevenLabs (cloud).
 //
 
 import Foundation
@@ -26,8 +27,16 @@ enum TTSClientFactory {
     static func makeClient(from appSettings: AppSettings) -> any TTSClient {
         switch appSettings.textToSpeechProviderKind {
         case .kokoro:
-            // Temporary: replaced by KokoroTTSClient once the engine exists.
-            return AppleSpeechTTSClient(voiceIdentifier: appSettings.appleVoiceIdentifier)
+            // Start (or continue) loading the model now so the first reply
+            // isn't stuck behind a cold load — same idea as OllamaModelWarmer.
+            let kokoroVoice = appSettings.kokoroVoice
+            Task {
+                await KokoroVoiceEngine.shared.prepareIfNeeded(preloadingVoice: kokoroVoice)
+            }
+            return KokoroTTSClient(
+                voice: kokoroVoice,
+                appleFallbackVoiceIdentifier: appSettings.appleVoiceIdentifier
+            )
         case .apple:
             return AppleSpeechTTSClient(voiceIdentifier: appSettings.appleVoiceIdentifier)
         case .elevenLabs:
