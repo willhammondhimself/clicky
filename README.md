@@ -1,162 +1,71 @@
-Update: April 27, 2026.
+# Clicky (Will's fork)
 
-Hi there! I'm Farza, the guy that made Clicky.
-
-The existing codebase remains open source. Tinker with it, make it yours, start a company out of it, do whatever you want I don't mind. But, for all the new stuff I'm hacking on, gonna keep it private. To get the latest Clicky, you can go [here](https://www.heyclicky.com/).
-
-I also tweeted about this [here](https://x.com/FarzaTV/status/2043402737828962489).
-
-Go crazy with this repo!! It's an MIT license.
-
-# Hi, this is Clicky.
-It's an AI teacher that lives as a buddy next to your cursor. It can see your screen, talk to you, and even point at stuff. Kinda like having a real teacher next to you.
-
-Download it [here](https://www.clicky.so/) for free.
-
-Here's the [original tweet](https://x.com/FarzaTV/status/2041314633978659092) that kinda blew up for a demo for more context.
+A fork of [farzaa/clicky](https://github.com/farzaa/clicky) — the MIT-licensed April 2026 prototype of what became [HeyClicky](https://www.heyclicky.com/). Hold a hotkey, ask a question out loud, and an AI buddy that can see your screen answers by voice and flies a little cursor to the button it's talking about.
 
 ![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
 
-This is the open-source version of Clicky for those that want to hack on it, build their own features, or just see how it works under the hood.
+## What's different in this fork
 
-## Get started with Claude Code
+Upstream routed every API call through a Cloudflare Worker that held the keys. This fork:
 
-The fastest way to get this running is with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+- **Calls providers directly.** No Worker, no Cloudflare account. API keys go in the in-app **AI Settings** panel and are stored in the macOS Keychain.
+- **Is provider-agnostic.** The chat model can be any OpenAI-compatible endpoint (OpenRouter, Ollama, LM Studio, vLLM…) or Anthropic directly. One OpenRouter key reaches Haiku 5.5, DeepSeek, GLM, Qwen-VL, Gemini, etc.
+- **Runs fully offline by default.** Fresh install = Apple Speech (STT) → Ollama on localhost (vision LLM) → Apple voices (TTS). Zero accounts needed. AssemblyAI and ElevenLabs are opt-in toggles.
+- **Phones home to nobody.** Upstream's PostHog telemetry, FormSpark email capture and Sparkle update feed are removed.
 
-Once you get Claude running, paste this:
+Everything else — the overlay, pointing animation, screen capture, push-to-talk — is Farza's code.
 
-```
-Hi Claude.
-
-Clone https://github.com/farzaa/clicky.git into my current directory.
-
-Then read the CLAUDE.md. I want to get Clicky running locally on my Mac.
-
-Help me set up everything — the Cloudflare Worker with my own API keys, the proxy URLs, and getting it building in Xcode. Walk me through it.
-```
-
-That's it. It'll clone the repo, read the docs, and walk you through the whole setup. Once you're running you can just keep talking to it — build features, fix bugs, whatever. Go crazy.
-
-## Manual setup
-
-If you want to do it yourself, here's the deal.
+## Setup
 
 ### Prerequisites
 
-- macOS 14.2+ (for ScreenCaptureKit)
-- Xcode 15+
-- Node.js 18+ (for the Cloudflare Worker)
-- A [Cloudflare](https://cloudflare.com) account (free tier works)
-- API keys for: [Anthropic](https://console.anthropic.com), [AssemblyAI](https://www.assemblyai.com), [ElevenLabs](https://elevenlabs.io)
+- macOS 14.2+ (ScreenCaptureKit). Developed on macOS 26 / Xcode 26.
+- For the offline default: [Ollama](https://ollama.com) with a vision-capable model, e.g. `ollama pull gemma4:26b` (18 GB, needs ~24 GB RAM) or a smaller `qwen3-vl` tag.
+- Optional: an [OpenRouter](https://openrouter.ai/keys) key for cloud models.
 
-### 1. Set up the Cloudflare Worker
-
-The Worker is a tiny proxy that holds your API keys. The app talks to the Worker, the Worker talks to the APIs. This way your keys never ship in the app binary.
-
-```bash
-cd worker
-npm install
-```
-
-Now add your secrets. Wrangler will prompt you to paste each one:
-
-```bash
-npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put ASSEMBLYAI_API_KEY
-npx wrangler secret put ELEVENLABS_API_KEY
-```
-
-For the ElevenLabs voice ID, open `wrangler.toml` and set it there (it's not sensitive):
-
-```toml
-[vars]
-ELEVENLABS_VOICE_ID = "your-voice-id-here"
-```
-
-Deploy it:
-
-```bash
-npx wrangler deploy
-```
-
-It'll give you a URL like `https://your-worker-name.your-subdomain.workers.dev`. Copy that.
-
-### 2. Run the Worker locally (for development)
-
-If you want to test changes to the Worker without deploying:
-
-```bash
-cd worker
-npx wrangler dev
-```
-
-This starts a local server (usually `http://localhost:8787`) that behaves exactly like the deployed Worker. You'll need to create a `.dev.vars` file in the `worker/` directory with your keys:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-ASSEMBLYAI_API_KEY=...
-ELEVENLABS_API_KEY=...
-ELEVENLABS_VOICE_ID=...
-```
-
-Then update the proxy URLs in the Swift code to point to `http://localhost:8787` instead of the deployed Worker URL while developing. Grep for `clicky-proxy` to find them all.
-
-### 3. Update the proxy URLs in the app
-
-The app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
-
-```bash
-grep -r "clicky-proxy" leanring-buddy/
-```
-
-You'll find it in:
-- `CompanionManager.swift` — Claude chat + ElevenLabs TTS
-- `AssemblyAIStreamingTranscriptionProvider.swift` — AssemblyAI token endpoint
-
-### 4. Open in Xcode and run
+### Build
 
 ```bash
 open leanring-buddy.xcodeproj
 ```
 
-In Xcode:
-1. Select the `leanring-buddy` scheme (yes, the typo is intentional, long story)
-2. Set your signing team under Signing & Capabilities
-3. Hit **Cmd + R** to build and run
+In Xcode: select the `leanring-buddy` scheme (the typo is intentional, long story), set your signing team under Signing & Capabilities, **Cmd + R**.
 
-The app will appear in your menu bar (not the dock). Click the icon to open the panel, grant the permissions it asks for, and you're good.
+Do not build with `xcodebuild` from the terminal — it invalidates the TCC permission grants and you'll have to re-grant everything.
 
-### Permissions the app needs
+### First run
 
-- **Microphone** — for push-to-talk voice capture
-- **Accessibility** — for the global keyboard shortcut (Control + Option)
-- **Screen Recording** — for taking screenshots when you use the hotkey
-- **Screen Content** — for ScreenCaptureKit access
+1. The app appears in the menu bar (no dock icon). Click it and grant the four permissions: Microphone, Accessibility, Screen Recording, Screen Content.
+2. Expand **AI Settings** in the panel:
+   - **Provider** — `Ollama (local)` with model `gemma4:26b` is the default. Switch to `OpenRouter`, paste a key, click Save; the model defaults to `anthropic/claude-haiku-5.5`.
+   - **Speech to text** — Apple (local) by default. AssemblyAI / OpenAI need a key.
+   - **Text to speech** — Apple (local) by default. For a less robotic voice, download an *Enhanced* or *Premium* voice in System Settings → Accessibility → Spoken Content → System Voice → Manage Voices, then pick it in the Voice menu. ElevenLabs needs a key.
+3. Hold **Control + Option**, ask something about your screen, release.
+
+Keys are read from the Keychain (service `com.willhammond.clicky`). `.env.example` documents them but is never read by the app.
 
 ## Architecture
 
-If you want the full technical breakdown, read `CLAUDE.md`. But here's the short version:
-
-**Menu bar app** (no dock icon) with two `NSPanel` windows — one for the control panel dropdown, one for the full-screen transparent cursor overlay. Push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript + screenshot to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in its responses to make the cursor fly to specific UI elements across multiple monitors. All three APIs are proxied through a Cloudflare Worker.
-
-## Project structure
+Menu bar app (`LSUIElement`) with two `NSPanel`s — the control panel and a full-screen transparent cursor overlay. Push-to-talk streams mic audio to the configured transcription provider; the transcript plus a JPEG of every screen goes to the configured chat client; the reply is parsed for a trailing `[POINT:x,y:label:screenN]` tag, spoken via the configured TTS client, and the cursor flies to the coordinate.
 
 ```
-leanring-buddy/          # Swift source (yes, the typo stays)
-  CompanionManager.swift    # Central state machine
-  CompanionPanelView.swift  # Menu bar panel UI
-  ClaudeAPI.swift           # Claude streaming client
-  ElevenLabsTTSClient.swift # Text-to-speech playback
-  OverlayWindow.swift       # Blue cursor overlay
-  AssemblyAI*.swift         # Real-time transcription
-  BuddyDictation*.swift     # Push-to-talk pipeline
-worker/                  # Cloudflare Worker proxy
-  src/index.ts              # Three routes: /chat, /tts, /transcribe-token
-CLAUDE.md                # Full architecture doc (agents read this)
+leanring-buddy/
+  CompanionManager.swift            # state machine: push-to-talk → screenshot → chat → TTS → pointing
+  AppSettings.swift                 # provider / model / voice choices (UserDefaults)
+  SecretsStore.swift                # API keys (Keychain)
+  ChatClient.swift                  # protocol + factory
+  OpenAICompatibleChatClient.swift  # OpenRouter / Ollama / any /chat/completions server
+  ClaudeAPI.swift                   # Anthropic Messages API (direct)
+  TTSClient.swift                   # protocol + factory
+  AppleSpeechTTSClient.swift        # AVSpeechSynthesizer (default)
+  ElevenLabsTTSClient.swift         # ElevenLabs (direct)
+  BuddyTranscriptionProvider.swift  # STT protocol + factory (Apple / AssemblyAI / OpenAI)
+  CompanionPanelView.swift          # menu bar panel incl. AI Settings
+  OverlayWindow.swift               # cursor overlay + pointing animation
 ```
 
-## Contributing
+See `AGENTS.md` for the full file map and conventions.
 
-PRs welcome. If you're using Claude Code, it already knows the codebase — just tell it what you want to build and point it at `CLAUDE.md`.
+## License
 
-Got feedback? DM me on X [@farzatv](https://x.com/farzatv).
+MIT — see `LICENSE`. Original work © 2026 Farza.

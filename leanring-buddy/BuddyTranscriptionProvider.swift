@@ -43,10 +43,15 @@ enum BuddyTranscriptionProviderFactory {
     }
 
     private static func resolveProvider() -> any BuddyTranscriptionProvider {
-        let preferredProviderRawValue = AppBundleConfiguration
+        // The in-app Settings choice wins. Info.plist is only consulted when
+        // the user has never touched the setting (it defaults to Apple anyway).
+        let settingsProviderRawValue = AppSettings.storedSpeechToTextProviderKind().rawValue
+        let infoPlistProviderRawValue = AppBundleConfiguration
             .stringValue(forKey: "VoiceTranscriptionProvider")?
             .lowercased()
-        let preferredProvider = preferredProviderRawValue.flatMap(PreferredProvider.init(rawValue:))
+        let hasExplicitSettingsChoice = UserDefaults.standard.string(forKey: AppSettings.Keys.speechToTextProvider) != nil
+        let preferredProviderRawValue = hasExplicitSettingsChoice ? settingsProviderRawValue : (infoPlistProviderRawValue ?? settingsProviderRawValue)
+        let preferredProvider = PreferredProvider(rawValue: preferredProviderRawValue)
 
         let assemblyAIProvider = AssemblyAIStreamingTranscriptionProvider()
         let openAIProvider = OpenAIAudioTranscriptionProvider()

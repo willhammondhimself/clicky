@@ -10,7 +10,6 @@
 import AVFoundation
 import Combine
 import Foundation
-import PostHog
 import ScreenCaptureKit
 import SwiftUI
 
@@ -68,17 +67,59 @@ final class CompanionManager: ObservableObject {
     // Response text is now displayed inline on the cursor overlay via
     // streamingResponseText, so no separate response overlay manager is needed.
 
-    /// Base URL for the Cloudflare Worker proxy. All API requests route
-    /// through this so keys never ship in the app binary.
-    private static let workerBaseURL = "https://your-worker-name.your-subdomain.workers.dev"
+    /// Where provider / model / voice choices live. Observed so the clients
+    /// below are rebuilt whenever the user changes something in Settings.
+    let appSettings = AppSettings.shared
 
-    private lazy var claudeAPI: ClaudeAPI = {
-        return ClaudeAPI(proxyURL: "\(Self.workerBaseURL)/chat", model: selectedModel)
-    }()
+    /// Vision-chat backend (OpenRouter, Ollama, Anthropic, or custom). Calls
+    /// the API directly with a key from the Keychain — no proxy.
+    private var chatClient: any ChatClient = ChatClientFactory.makeClient(from: AppSettings.shared)
 
-    private lazy var elevenLabsTTSClient: ElevenLabsTTSClient = {
-        return ElevenLabsTTSClient(proxyURL: "\(Self.workerBaseURL)/tts")
-    }()
+    /// Text-to-speech backend (Apple on-device by default, ElevenLabs opt-in).
+    private var textToSpeechClient: any TTSClient = TTSClientFactory.makeClient(from: AppSettings.shared)
+
+    private var settingsObservationCancellables: Set<AnyCancellable> = []
+
+    /// Recreates the chat and TTS clients from the current settings. Called
+    /// automatically on settings changes and by the panel after a key is saved
+    /// (keys live in the Keychain, so settings publishers don't see them change).
+    func rebuildClientsFromSettings() {
+        textToSpeechClient.stopPlayback()
+        chatClient = ChatClientFactory.makeClient(from: appSettings)
+        textToSpeechClient = TTSClientFactory.makeClient(from: appSettings)
+        print("🔧 Clients rebuilt — chat: \(appSettings.chatProviderKind.displayName) [\(appSettings.chatModel)], tts: \(appSettings.textToSpeechProviderKind.displayName)")
+    }
+
+    /// Text fields publish on every keystroke, so changes are debounced before
+    /// tearing down and recreating the network clients.
+    private func bindSettingsObservation() {
+        let chatSettingsChanged = Publishers.Merge3(
+            appSettings.$chatProviderKind.map { _ in () },
+            appSettings.$chatBaseURL.map { _ in () },
+            appSettings.$chatModel.map { _ in () }
+        )
+        let voiceSettingsChanged = Publishers.Merge3(
+            appSettings.$textToSpeechProviderKind.map { _ in () },
+            appSettings.$appleVoiceIdentifier.map { _ in () },
+            appSettings.$elevenLabsVoiceID.map { _ in () }
+        )
+
+        Publishers.Merge(chatSettingsChanged, voiceSettingsChanged)
+            .dropFirst(6) // skip the initial value each of the six publishers emits on subscribe
+            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.rebuildClientsFromSettings()
+            }
+            .store(in: &settingsObservationCancellables)
+
+        appSettings.$speechToTextProviderKind
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.buddyDictationManager.reloadTranscriptionProviderFromSettings()
+            }
+            .store(in: &settingsObservationCancellables)
+    }
 
     /// Conversation history so Claude remembers prior exchanges within a session.
     /// Each entry is the user's transcript and Claude's response.
@@ -106,15 +147,6 @@ final class CompanionManager: ObservableObject {
     /// Whether the blue cursor overlay is currently visible on screen.
     /// Used by the panel to show accurate status text ("Active" vs "Ready").
     @Published private(set) var isOverlayVisible: Bool = false
-
-    /// The Claude model used for voice responses. Persisted to UserDefaults.
-    @Published var selectedModel: String = UserDefaults.standard.string(forKey: "selectedClaudeModel") ?? "claude-sonnet-4-6"
-
-    func setSelectedModel(_ model: String) {
-        selectedModel = model
-        UserDefaults.standard.set(model, forKey: "selectedClaudeModel")
-        claudeAPI.model = model
-    }
 
     /// User preference for whether the Clicky cursor should be shown.
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
@@ -149,27 +181,14 @@ final class CompanionManager: ObservableObject {
     /// Whether the user has submitted their email during onboarding.
     @Published var hasSubmittedEmail: Bool = UserDefaults.standard.bool(forKey: "hasSubmittedEmail")
 
-    /// Submits the user's email to FormSpark and identifies them in PostHog.
+    /// Upstream sent the email to FormSpark and PostHog. This fork keeps the
+    /// onboarding flow but sends the address nowhere — it only flips the flag.
     func submitEmail(_ email: String) {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEmail.isEmpty else { return }
 
         hasSubmittedEmail = true
         UserDefaults.standard.set(true, forKey: "hasSubmittedEmail")
-
-        // Identify user in PostHog
-        PostHogSDK.shared.identify(trimmedEmail, userProperties: [
-            "email": trimmedEmail
-        ])
-
-        // Submit to FormSpark
-        Task {
-            var request = URLRequest(url: URL(string: "https://submit-form.com/RWbGJxmIs")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: ["email": trimmedEmail])
-            _ = try? await URLSession.shared.data(for: request)
-        }
     }
 
     func start() {
@@ -179,9 +198,7 @@ final class CompanionManager: ObservableObject {
         bindVoiceStateObservation()
         bindAudioPowerLevel()
         bindShortcutTransitions()
-        // Eagerly touch the Claude API so its TLS warmup handshake completes
-        // well before the onboarding demo fires at ~40s into the video.
-        _ = claudeAPI
+        bindSettingsObservation()
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
@@ -493,7 +510,7 @@ final class CompanionManager: ObservableObject {
 
             // Cancel any in-progress response and TTS from a previous utterance
             currentResponseTask?.cancel()
-            elevenLabsTTSClient.stopPlayback()
+            textToSpeechClient.stopPlayback()
             clearDetectedElementLocation()
 
             // Dismiss the onboarding prompt if it's showing
@@ -578,14 +595,14 @@ final class CompanionManager: ObservableObject {
 
     // MARK: - AI Response Pipeline
 
-    /// Captures a screenshot, sends it along with the transcript to Claude,
-    /// and plays the response aloud via ElevenLabs TTS. The cursor stays in
-    /// the spinner/processing state until TTS audio begins playing.
-    /// Claude's response may include a [POINT:x,y:label] tag which triggers
-    /// the buddy to fly to that element on screen.
+    /// Captures a screenshot, sends it along with the transcript to the
+    /// configured chat model, and plays the response aloud via the configured
+    /// TTS client. The cursor stays in the spinner/processing state until TTS
+    /// audio begins playing. The response may include a [POINT:x,y:label] tag
+    /// which triggers the buddy to fly to that element on screen.
     private func sendTranscriptToClaudeWithScreenshot(transcript: String) {
         currentResponseTask?.cancel()
-        elevenLabsTTSClient.stopPlayback()
+        textToSpeechClient.stopPlayback()
 
         currentResponseTask = Task {
             // Stay in processing (spinner) state — no streaming text displayed
@@ -610,7 +627,7 @@ final class CompanionManager: ObservableObject {
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
                 }
 
-                let (fullResponseText, _) = try await claudeAPI.analyzeImageStreaming(
+                let (fullResponseText, _) = try await chatClient.analyzeImageStreaming(
                     images: labeledImages,
                     systemPrompt: Self.companionVoiceResponseSystemPrompt,
                     conversationHistory: historyForAPI,
@@ -701,13 +718,13 @@ final class CompanionManager: ObservableObject {
                 // until the audio actually starts playing, then switch to responding.
                 if !spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     do {
-                        try await elevenLabsTTSClient.speakText(spokenText)
-                        // speakText returns after player.play() — audio is now playing
+                        try await textToSpeechClient.speakText(spokenText)
+                        // speakText returns once audio is playing
                         voiceState = .responding
                     } catch {
                         ClickyAnalytics.trackTTSError(error: error.localizedDescription)
-                        print("⚠️ ElevenLabs TTS error: \(error)")
-                        speakCreditsErrorFallback()
+                        print("⚠️ TTS error: \(error)")
+                        speakErrorFallback("i couldn't play that reply out loud. check the text to speech settings.")
                     }
                 }
             } catch is CancellationError {
@@ -715,7 +732,7 @@ final class CompanionManager: ObservableObject {
             } catch {
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
-                speakCreditsErrorFallback()
+                speakErrorFallback("i couldn't reach the model. check the provider and api key in settings.")
             }
 
             if !Task.isCancelled {
@@ -735,7 +752,7 @@ final class CompanionManager: ObservableObject {
         transientHideTask?.cancel()
         transientHideTask = Task {
             // Wait for TTS audio to finish playing
-            while elevenLabsTTSClient.isPlaying {
+            while textToSpeechClient.isPlaying {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled else { return }
             }
@@ -755,13 +772,12 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// Speaks a hardcoded error message using macOS system TTS when API
-    /// credits run out. Uses NSSpeechSynthesizer so it works even when
-    /// ElevenLabs is down.
-    private func speakCreditsErrorFallback() {
-        let utterance = "I'm all out of credits. Please DM Farza and tell him to bring me back to life."
+    /// Speaks an error message using the always-available macOS system
+    /// synthesizer, so the user hears something even when the configured
+    /// chat or TTS backend is down or misconfigured.
+    private func speakErrorFallback(_ errorMessage: String) {
         let synthesizer = NSSpeechSynthesizer()
-        synthesizer.startSpeaking(utterance)
+        synthesizer.startSpeaking(errorMessage)
         voiceState = .responding
     }
 
@@ -982,7 +998,7 @@ final class CompanionManager: ObservableObject {
                 let dimensionInfo = " (image dimensions: \(cursorScreenCapture.screenshotWidthInPixels)x\(cursorScreenCapture.screenshotHeightInPixels) pixels)"
                 let labeledImages = [(data: cursorScreenCapture.imageData, label: cursorScreenCapture.label + dimensionInfo)]
 
-                let (fullResponseText, _) = try await claudeAPI.analyzeImageStreaming(
+                let (fullResponseText, _) = try await chatClient.analyzeImageStreaming(
                     images: labeledImages,
                     systemPrompt: Self.onboardingDemoSystemPrompt,
                     userPrompt: "look around my screen and find something interesting to point at",

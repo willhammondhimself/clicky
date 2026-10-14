@@ -3,7 +3,7 @@
 //  leanring-buddy
 //
 //  The SwiftUI content hosted inside the menu bar panel. Shows the companion
-//  voice status, push-to-talk shortcut, and quick settings. Designed to feel
+//  voice status, push-to-talk shortcut, and AI settings. Designed to feel
 //  like Loom's recording panel — dark, rounded, minimal, and special.
 //
 
@@ -12,7 +12,14 @@ import SwiftUI
 
 struct CompanionPanelView: View {
     @ObservedObject var companionManager: CompanionManager
+    @ObservedObject private var appSettings = AppSettings.shared
     @State private var emailInput: String = ""
+    @State private var isAISettingsExpanded: Bool = false
+    /// Draft text for each API key field. Keys are written to the Keychain
+    /// only when the user clicks Save, never on every keystroke.
+    @State private var apiKeyDrafts: [SecretsStore.Key: String] = [:]
+    /// Which keys currently have a value in the Keychain (for the ✓ badge).
+    @State private var savedAPIKeys: Set<SecretsStore.Key> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -25,11 +32,11 @@ struct CompanionPanelView: View {
                 .padding(.top, 16)
                 .padding(.horizontal, 16)
 
-            if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
+            if companionManager.allPermissionsGranted {
                 Spacer()
                     .frame(height: 12)
 
-                modelPickerRow
+                aiSettingsSection
                     .padding(.horizontal, 16)
             }
 
@@ -79,6 +86,7 @@ struct CompanionPanelView: View {
         }
         .frame(width: 320)
         .background(panelBackground)
+        .onAppear(perform: refreshSavedAPIKeyBadges)
     }
 
     // MARK: - Header
@@ -596,49 +604,224 @@ struct CompanionPanelView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Model Picker
+    // MARK: - AI Settings (provider, model, voice, API keys)
 
-    private var modelPickerRow: some View {
-        HStack {
-            Text("Model")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+    private var aiSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            aiSettingsHeaderRow
 
-            Spacer()
+            if isAISettingsExpanded {
+                settingsSubsectionLabel("MODEL")
+                settingsPickerRow(title: "Provider", selection: $appSettings.chatProviderKind)
 
-            HStack(spacing: 0) {
-                modelOptionButton(label: "Sonnet", modelID: "claude-sonnet-4-6")
-                modelOptionButton(label: "Opus", modelID: "claude-opus-4-6")
+                if appSettings.chatProviderKind.usesOpenAICompatibleAPI {
+                    settingsTextFieldRow(title: "Base URL", text: $appSettings.chatBaseURL, placeholder: "https://…/v1")
+                }
+                settingsTextFieldRow(title: "Model", text: $appSettings.chatModel, placeholder: "model id")
+
+                if let chatSecretKey = appSettings.chatProviderKind.secretKey {
+                    apiKeyRow(for: chatSecretKey)
+                }
+
+                settingsSubsectionLabel("VOICE")
+                    .padding(.top, 4)
+                settingsPickerRow(title: "Speech to text", selection: $appSettings.speechToTextProviderKind)
+                if let speechToTextSecretKey = appSettings.speechToTextProviderKind.secretKey {
+                    apiKeyRow(for: speechToTextSecretKey)
+                }
+
+                settingsPickerRow(title: "Text to speech", selection: $appSettings.textToSpeechProviderKind)
+                switch appSettings.textToSpeechProviderKind {
+                case .apple:
+                    appleVoicePickerRow
+                case .elevenLabs:
+                    apiKeyRow(for: .elevenLabs)
+                    settingsTextFieldRow(title: "Voice ID", text: $appSettings.elevenLabsVoiceID, placeholder: AppSettings.defaultElevenLabsVoiceID)
+                }
+
+                Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Apple to run fully offline.")
+                    .font(.system(size: 10))
+                    .foregroundColor(DS.Colors.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
-            )
         }
-        .padding(.vertical, 4)
     }
 
-    private func modelOptionButton(label: String, modelID: String) -> some View {
-        let isSelected = companionManager.selectedModel == modelID
-        return Button(action: {
-            companionManager.setSelectedModel(modelID)
+    /// Collapsed by default so the panel stays short; the summary line shows
+    /// the active stack at a glance.
+    private var aiSettingsHeaderRow: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isAISettingsExpanded.toggle()
+            }
         }) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(isSelected ? DS.Colors.textPrimary : DS.Colors.textTertiary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isSelected ? Color.white.opacity(0.1) : Color.clear)
-                )
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("AI Settings")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
+                    Text(activeStackSummary)
+                        .font(.system(size: 10))
+                        .foregroundColor(DS.Colors.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+
+                Image(systemName: isAISettingsExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(DS.Colors.textTertiary)
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .pointerCursor()
+        .padding(.vertical, 4)
+    }
+
+    private var activeStackSummary: String {
+        let speechToTextName = appSettings.speechToTextProviderKind.displayName
+        let chatName = "\(appSettings.chatProviderKind.displayName) · \(appSettings.chatModel)"
+        let textToSpeechName = appSettings.textToSpeechProviderKind.displayName
+        return "\(speechToTextName) → \(chatName) → \(textToSpeechName)"
+    }
+
+    private func settingsSubsectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundColor(DS.Colors.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func settingsPickerRow<Kind: CaseIterable & Identifiable & RawRepresentable & Hashable>(
+        title: String,
+        selection: Binding<Kind>
+    ) -> some View where Kind.AllCases: RandomAccessCollection {
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+            Spacer()
+            Picker("", selection: selection) {
+                ForEach(Array(Kind.allCases)) { kind in
+                    Text(displayName(for: kind)).tag(kind)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 160)
+        }
+    }
+
+    /// The three provider enums each expose `displayName`; this keeps the
+    /// generic picker row from needing a shared protocol.
+    private func displayName<Kind>(for kind: Kind) -> String {
+        if let chatProviderKind = kind as? ChatProviderKind { return chatProviderKind.displayName }
+        if let speechToTextProviderKind = kind as? SpeechToTextProviderKind { return speechToTextProviderKind.displayName }
+        if let textToSpeechProviderKind = kind as? TextToSpeechProviderKind { return textToSpeechProviderKind.displayName }
+        return "\(kind)"
+    }
+
+    private func settingsTextFieldRow(title: String, text: Binding<String>, placeholder: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+            Spacer()
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(maxWidth: 190)
+        }
+    }
+
+    private var appleVoicePickerRow: some View {
+        let availableVoices = AppSettings.availableAppleVoices()
+        return HStack {
+            Text("Voice")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+            Spacer()
+            Picker("", selection: $appSettings.appleVoiceIdentifier) {
+                Text("System default").tag("")
+                ForEach(availableVoices, id: \.identifier) { voice in
+                    Text(appleVoiceLabel(for: voice)).tag(voice.identifier)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 190)
+        }
+    }
+
+    private func appleVoiceLabel(for voice: AVSpeechSynthesisVoice) -> String {
+        switch voice.quality {
+        case .premium: return "\(voice.name) (Premium)"
+        case .enhanced: return "\(voice.name) (Enhanced)"
+        default: return voice.name
+        }
+    }
+
+    /// SecureField + Save button for one Keychain-backed API key. The ✓ badge
+    /// means a value is saved; the field itself never displays the stored key.
+    private func apiKeyRow(for secretKey: SecretsStore.Key) -> some View {
+        let isSaved = savedAPIKeys.contains(secretKey)
+        let draftBinding = Binding<String>(
+            get: { apiKeyDrafts[secretKey] ?? "" },
+            set: { apiKeyDrafts[secretKey] = $0 }
+        )
+        return HStack(spacing: 6) {
+            Text("\(secretKey.displayName) key")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+
+            if isSaved {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(DS.Colors.success)
+            }
+
+            Spacer()
+
+            SecureField(isSaved ? "saved — paste to replace" : "paste key", text: draftBinding)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(maxWidth: 140)
+
+            Button(action: {
+                saveAPIKey(secretKey)
+            }) {
+                Text("Save")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(DS.Colors.textPrimary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.white.opacity(0.1))
+                    )
+            }
+            .buttonStyle(.plain)
+            .pointerCursor()
+            .disabled((apiKeyDrafts[secretKey] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private func saveAPIKey(_ secretKey: SecretsStore.Key) {
+        let draftValue = apiKeyDrafts[secretKey] ?? ""
+        SecretsStore.write(secretKey, value: draftValue)
+        apiKeyDrafts[secretKey] = ""
+        refreshSavedAPIKeyBadges()
+        // Keys live outside AppSettings, so the settings publishers won't
+        // notice — rebuild the clients explicitly.
+        companionManager.rebuildClientsFromSettings()
+        companionManager.buddyDictationManager.reloadTranscriptionProviderFromSettings()
+    }
+
+    private func refreshSavedAPIKeyBadges() {
+        savedAPIKeys = Set(SecretsStore.Key.allCases.filter(SecretsStore.hasValue))
     }
 
     // MARK: - DM Farza Button

@@ -262,7 +262,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         return AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
     }
 
-    private let transcriptionProvider: any BuddyTranscriptionProvider
+    private var transcriptionProvider: any BuddyTranscriptionProvider
     private let audioEngine = AVAudioEngine()
     private var activeTranscriptionSession: (any BuddyStreamingTranscriptionSession)?
     private var activeStartSource: BuddyDictationStartSource?
@@ -289,6 +289,15 @@ final class BuddyDictationManager: NSObject, ObservableObject {
 
     func updateContextualKeyterms(_ contextualKeyterms: [String]) {
         self.contextualKeyterms = contextualKeyterms
+    }
+
+    /// Swaps the transcription backend after the user changes Speech to Text
+    /// in Settings. Takes effect on the next push-to-talk; an in-flight
+    /// session keeps the provider it started with.
+    func reloadTranscriptionProviderFromSettings() {
+        let replacementTranscriptionProvider = BuddyTranscriptionProviderFactory.makeDefaultProvider()
+        transcriptionProvider = replacementTranscriptionProvider
+        transcriptionProviderDisplayName = replacementTranscriptionProvider.displayName
     }
 
     func startPersistentDictationFromMicrophoneButton(

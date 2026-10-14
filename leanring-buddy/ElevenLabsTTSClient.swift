@@ -2,25 +2,29 @@
 //  ElevenLabsTTSClient.swift
 //  leanring-buddy
 //
-//  Streams text-to-speech audio from ElevenLabs and plays it back
-//  through the system audio output. Uses the streaming endpoint so
-//  playback begins before the full audio has been generated.
+//  Fetches text-to-speech audio from ElevenLabs and plays it back through
+//  the system audio output. Calls the API directly with a key from the
+//  Keychain; opt-in via Settings → Text to Speech.
 //
 
 import AVFoundation
 import Foundation
 
 @MainActor
-final class ElevenLabsTTSClient {
-    private let proxyURL: URL
+final class ElevenLabsTTSClient: TTSClient {
+    private let textToSpeechURL: URL
+    private let apiKey: String?
     private let session: URLSession
 
     /// The audio player for the current TTS playback. Kept alive so the
     /// audio finishes playing even if the caller doesn't hold a reference.
     private var audioPlayer: AVAudioPlayer?
 
-    init(proxyURL: String) {
-        self.proxyURL = URL(string: proxyURL)!
+    init(apiKey: String?, voiceID: String) {
+        self.apiKey = apiKey
+        let trimmedVoiceID = voiceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveVoiceID = trimmedVoiceID.isEmpty ? AppSettings.defaultElevenLabsVoiceID : trimmedVoiceID
+        self.textToSpeechURL = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(effectiveVoiceID)")!
 
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
@@ -31,10 +35,16 @@ final class ElevenLabsTTSClient {
     /// Sends `text` to ElevenLabs TTS and plays the resulting audio.
     /// Throws on network or decoding errors. Cancellation-safe.
     func speakText(_ text: String) async throws {
-        var request = URLRequest(url: proxyURL)
+        guard let apiKey else {
+            throw NSError(domain: "ElevenLabsTTS", code: -2,
+                          userInfo: [NSLocalizedDescriptionKey: "No ElevenLabs API key saved. Add one in Settings or switch Text to Speech to Apple."])
+        }
+
+        var request = URLRequest(url: textToSpeechURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+        request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
 
         let body: [String: Any] = [
             "text": text,

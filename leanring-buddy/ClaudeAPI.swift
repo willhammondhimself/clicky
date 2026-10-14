@@ -6,16 +6,20 @@
 import Foundation
 
 /// Claude API helper with streaming for progressive text display.
-class ClaudeAPI {
+/// Talks to the Anthropic Messages API directly with a key from the Keychain.
+class ClaudeAPI: ChatClient {
     private static let tlsWarmupLock = NSLock()
     private static var hasStartedTLSWarmup = false
+    private static let anthropicMessagesURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
     private let apiURL: URL
+    private let apiKey: String?
     var model: String
     private let session: URLSession
 
-    init(proxyURL: String, model: String = "claude-sonnet-4-6") {
-        self.apiURL = URL(string: proxyURL)!
+    init(apiKey: String?, model: String) {
+        self.apiURL = Self.anthropicMessagesURL
+        self.apiKey = apiKey
         self.model = model
 
         // Use .default instead of .ephemeral so TLS session tickets are cached.
@@ -41,6 +45,10 @@ class ClaudeAPI {
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        if let apiKey {
+            request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        }
         return request
     }
 
@@ -101,11 +109,19 @@ class ClaudeAPI {
     func analyzeImageStreaming(
         images: [(data: Data, label: String)],
         systemPrompt: String,
-        conversationHistory: [(userPlaceholder: String, assistantResponse: String)] = [],
+        conversationHistory: [(userPlaceholder: String, assistantResponse: String)],
         userPrompt: String,
         onTextChunk: @MainActor @Sendable (String) -> Void
     ) async throws -> (text: String, duration: TimeInterval) {
         let startTime = Date()
+
+        guard apiKey != nil else {
+            throw NSError(
+                domain: "ClaudeAPI",
+                code: -3,
+                userInfo: [NSLocalizedDescriptionKey: "No Anthropic API key saved. Add one in Settings or switch the provider."]
+            )
+        }
 
         var request = makeAPIRequest()
 

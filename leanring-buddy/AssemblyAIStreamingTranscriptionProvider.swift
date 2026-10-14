@@ -17,15 +17,21 @@ struct AssemblyAIStreamingTranscriptionProviderError: LocalizedError {
 }
 
 final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider {
-    /// URL for the Cloudflare Worker endpoint that returns a short-lived
-    /// AssemblyAI streaming token. The real API key never leaves the server.
-    private static let tokenProxyURL = "https://your-worker-name.your-subdomain.workers.dev/transcribe-token"
+    /// AssemblyAI endpoint that exchanges the real API key for a short-lived
+    /// websocket token, so the key itself is never put on the socket URL.
+    private static let temporaryTokenURL = URL(string: "https://streaming.assemblyai.com/v3/token?expires_in_seconds=480")!
+
+    private let apiKey = SecretsStore.read(.assemblyAI)
 
     let displayName = "AssemblyAI"
     let requiresSpeechRecognitionPermission = false
 
-    var isConfigured: Bool { true }
-    var unavailableExplanation: String? { nil }
+    var isConfigured: Bool { apiKey != nil }
+
+    var unavailableExplanation: String? {
+        guard !isConfigured else { return nil }
+        return "AssemblyAI is not configured. Add an API key in Settings."
+    }
 
     /// Single long-lived URLSession shared across all streaming sessions.
     /// Creating and invalidating a URLSession per session corrupts the OS
@@ -57,10 +63,17 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
         return session
     }
 
-    /// Calls the Cloudflare Worker to get a short-lived AssemblyAI token.
+    /// Exchanges the API key for a short-lived AssemblyAI streaming token.
     private func fetchTemporaryToken() async throws -> String {
-        var request = URLRequest(url: URL(string: Self.tokenProxyURL)!)
-        request.httpMethod = "POST"
+        guard let apiKey else {
+            throw AssemblyAIStreamingTranscriptionProviderError(
+                message: unavailableExplanation ?? "AssemblyAI is not configured."
+            )
+        }
+
+        var request = URLRequest(url: Self.temporaryTokenURL)
+        request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -76,7 +89,7 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let token = json["token"] as? String else {
             throw AssemblyAIStreamingTranscriptionProviderError(
-                message: "Invalid token response from proxy."
+                message: "Invalid token response from AssemblyAI."
             )
         }
 
