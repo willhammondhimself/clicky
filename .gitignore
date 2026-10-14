@@ -10,3 +10,4 @@ coding-plans/
 .env.*
 !.env.example
 xcuserdata/
+tools/logic-tests/.build/
