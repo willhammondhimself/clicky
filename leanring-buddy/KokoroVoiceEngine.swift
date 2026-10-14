@@ -4,12 +4,14 @@
 //
 //  Owns the single Kokoro model manager from FluidAudio. It is a singleton
 //  because CompanionManager rebuilds its TTS client on every settings change
-//  and the Kokoro models (~300 MB, compiled for the Neural Engine on first
-//  use) must load once per app run, not once per client.
+//  and the Kokoro models (~380 MB under Application Support plus ~40 MB of
+//  pronunciation assets in FluidAudio's own cache, compiled for the Neural
+//  Engine on first use) must load once per app run, not once per client.
 //
 //  First run downloads the models from Hugging Face and compiles them, which
-//  takes tens of seconds; later runs load in well under a second. The panel
-//  observes `loadState` to show what is happening.
+//  takes tens of seconds; later runs load in about a second. The panel
+//  observes `loadState` to show what is happening. Load sequencing (one load
+//  at a time, sticky failures, retry) lives in KokoroModelLoadCoordinator.
 //
 
 import AVFoundation
@@ -18,16 +20,7 @@ import FluidAudio
 import Foundation
 
 @MainActor
-final class KokoroVoiceEngine: ObservableObject {
-    enum LoadState: Equatable {
-        case notLoaded
-        case loading
-        case ready
-        case failed(message: String)
-        /// This macOS build cannot run Kokoro safely; see KokoroOperatingSystemSupport.
-        case unavailable(reason: String)
-    }
-
+final class KokoroVoiceEngine: ObservableObject, KokoroSentenceSynthesizing {
     enum EngineError: LocalizedError {
         case modelNotReady
         case emptyAudio
@@ -42,74 +35,63 @@ final class KokoroVoiceEngine: ObservableObject {
 
     static let shared = KokoroVoiceEngine()
 
-    /// Everything Kokoro downloads lives here so it is easy to find and delete.
+    /// The CoreML models and voice packs. FluidAudio keeps its English
+    /// pronunciation assets (BART G2P + lexicon, ~40 MB) in its own default
+    /// cache regardless of this setting.
     static let modelsDirectory: URL = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Clicky/Models", isDirectory: true)
 
-    @Published private(set) var loadState: LoadState
+    @Published private(set) var loadState: KokoroModelLoadState = .notLoaded
 
+    private var loadCoordinator: KokoroModelLoadCoordinator!
     private var kokoroManager: KokoroAneManager?
-    private var inFlightLoadTask: Task<Void, Never>?
-    /// Voice packs already fetched and converted, so switching back to one is instant.
-    private var preloadedVoices: Set<String> = []
+    private var loadStateCancellable: AnyCancellable?
 
     private init() {
+        let initialState: KokoroModelLoadState
         if let blockingReason = KokoroOperatingSystemSupport.blockingReason(for: ProcessInfo.processInfo.operatingSystemVersion) {
-            loadState = .unavailable(reason: blockingReason)
+            initialState = .unavailable(reason: blockingReason)
         } else {
-            loadState = .notLoaded
+            initialState = .notLoaded
+        }
+
+        loadCoordinator = KokoroModelLoadCoordinator(initialState: initialState) { [weak self] voice in
+            guard let self else { return }
+            try await self.loadModelAndVoice(voice)
+        }
+        loadState = initialState
+        loadStateCancellable = loadCoordinator.$loadState.sink { [weak self] newState in
+            self?.loadState = newState
         }
     }
 
     // MARK: - Loading
 
     /// Downloads (first time), compiles and loads the models plus `voice`'s
-    /// pack. Returns when done or failed; never throws. Safe to call
-    /// repeatedly — a load already in flight is awaited, and a voice already
-    /// preloaded returns immediately.
+    /// pack. Returns when done or failed; never throws. Safe to call from
+    /// several places at once — see KokoroModelLoadCoordinator.
     func prepareIfNeeded(preloadingVoice voice: String) async {
-        if case .unavailable = loadState { return }
-
-        if let inFlightLoadTask {
-            await inFlightLoadTask.value
-        }
-
-        if case .ready = loadState, preloadedVoices.contains(voice) { return }
-        if case .failed = loadState { return }
-
-        let manager = kokoroManager ?? makeManager()
-        kokoroManager = manager
-        loadState = .loading
-
-        let loadTask = Task { [weak self] in
-            do {
-                try await manager.initialize(preloadVoices: [voice])
-                // The first synthesis pays for the pronunciation lexicon
-                // (178k entries) and the Neural Engine kernel compile —
-                // around 9 s on Will's M4 Pro. Spend it now, while nobody is
-                // waiting, instead of on the first real reply.
-                let warmUpStart = Date()
-                _ = try await manager.synthesizeDetailed(text: "ready.", voice: voice)
-                self?.preloadedVoices.insert(voice)
-                self?.loadState = .ready
-                print("🔊 Kokoro: model ready, voice \(voice) loaded (warm-up synthesis \(String(format: "%.1f", Date().timeIntervalSince(warmUpStart))) s)")
-            } catch {
-                self?.loadState = .failed(message: "couldn't load the kokoro voice model: \(error.localizedDescription)")
-                print("⚠️ Kokoro load failed: \(error)")
-            }
-        }
-        inFlightLoadTask = loadTask
-        await loadTask.value
-        inFlightLoadTask = nil
+        await loadCoordinator.prepareIfNeeded(preloadingVoice: voice)
     }
 
     /// Clears a `failed` state and tries again. Used by the Retry button.
     func retryLoad(preloadingVoice voice: String) async {
-        if case .failed = loadState {
-            loadState = .notLoaded
-        }
-        await prepareIfNeeded(preloadingVoice: voice)
+        await loadCoordinator.retryLoad(preloadingVoice: voice)
+    }
+
+    private func loadModelAndVoice(_ voice: String) async throws {
+        let manager = kokoroManager ?? makeManager()
+        kokoroManager = manager
+        try await manager.initialize(preloadVoices: [voice])
+
+        // The first synthesis pays for the pronunciation lexicon (178k
+        // entries) and the Neural Engine kernel compile — around 9 s on
+        // Will's M4 Pro. Spend it now, while nobody is waiting, instead of
+        // on the first real reply.
+        let warmUpStart = Date()
+        _ = try await manager.synthesizeDetailed(text: "ready.", voice: voice)
+        print("🔊 Kokoro: model ready, voice \(voice) loaded (warm-up synthesis \(String(format: "%.1f", Date().timeIntervalSince(warmUpStart))) s)")
     }
 
     // MARK: - Synthesis

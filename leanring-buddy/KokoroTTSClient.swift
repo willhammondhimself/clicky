@@ -18,15 +18,19 @@ import Foundation
 @MainActor
 final class KokoroTTSClient: TTSClient {
     private let voice: String
-    private let voiceEngine: KokoroVoiceEngine
+    private let voiceEngine: any KokoroSentenceSynthesizing
     private let queuePlayer = SentenceAudioQueuePlayer()
     private let appleFallbackClient: AppleSpeechTTSClient
 
     /// Synthesizes sentences two onward after `speakText` has returned.
     private var remainingSentencesTask: Task<Void, Never>?
+    /// True while `remainingSentencesTask` is the live task for the current
+    /// reply. Only that task may clear it (see the identity check below), so
+    /// an abandoned task from an earlier reply cannot clear it for its
+    /// successor.
     private var isSynthesizingRemainingSentences = false
 
-    init(voice: String, appleFallbackVoiceIdentifier: String, voiceEngine: KokoroVoiceEngine = .shared) {
+    init(voice: String, appleFallbackVoiceIdentifier: String, voiceEngine: any KokoroSentenceSynthesizing) {
         self.voice = voice
         self.voiceEngine = voiceEngine
         self.appleFallbackClient = AppleSpeechTTSClient(voiceIdentifier: appleFallbackVoiceIdentifier)
@@ -82,9 +86,16 @@ final class KokoroTTSClient: TTSClient {
         guard !remainingSentences.isEmpty else { return }
 
         isSynthesizingRemainingSentences = true
+        let replyGeneration = nextReplyGeneration()
         remainingSentencesTask = Task { [weak self] in
             guard let self else { return }
-            defer { self.isSynthesizingRemainingSentences = false }
+            defer {
+                // A task cancelled by stopPlayback may resume after the next
+                // reply has started; it must not clear the newer reply's flag.
+                if self.currentReplyGeneration == replyGeneration {
+                    self.isSynthesizingRemainingSentences = false
+                }
+            }
 
             for (sentenceIndex, sentence) in remainingSentences.enumerated() {
                 guard !Task.isCancelled else { return }
@@ -105,6 +116,14 @@ final class KokoroTTSClient: TTSClient {
 
     var isPlaying: Bool {
         queuePlayer.isPlaying || isSynthesizingRemainingSentences || appleFallbackClient.isPlaying
+    }
+
+    /// Identifies which reply a `remainingSentencesTask` belongs to.
+    private var currentReplyGeneration = 0
+
+    private func nextReplyGeneration() -> Int {
+        currentReplyGeneration += 1
+        return currentReplyGeneration
     }
 
     func stopPlayback() {
