@@ -114,9 +114,10 @@ enum TextToSpeechProviderKind: String, CaseIterable, Identifiable {
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
-    /// UserDefaults keys. Kept in a nonisolated enum so non-main-actor code
-    /// (e.g. the transcription provider factory) can read the raw values.
-    enum Keys {
+    /// UserDefaults keys. Explicitly nonisolated (the project defaults every
+    /// type to the main actor) so non-main-actor code such as the
+    /// transcription provider factory can read the raw values.
+    nonisolated enum Keys {
         static let chatProvider = "settings.chatProvider"
         static let chatBaseURL = "settings.chatBaseURL"
         static let chatModel = "settings.chatModel"

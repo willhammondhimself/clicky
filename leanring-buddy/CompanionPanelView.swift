@@ -821,7 +821,12 @@ struct CompanionPanelView: View {
     }
 
     private func refreshSavedAPIKeyBadges() {
-        savedAPIKeys = Set(SecretsStore.Key.allCases.filter(SecretsStore.hasValue))
+        // Explicit closure rather than passing `SecretsStore.hasValue` directly:
+        // a bare function reference loses main-actor isolation under the
+        // project's default-MainActor setting and the compiler warns.
+        savedAPIKeys = Set(SecretsStore.Key.allCases.filter { secretKey in
+            SecretsStore.hasValue(secretKey)
+        })
     }
 
     // MARK: - DM Farza Button
