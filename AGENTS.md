@@ -47,6 +47,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 | `SecretsStore.swift` | ~110 | Keychain wrapper for API keys (OpenRouter, Anthropic, AssemblyAI, ElevenLabs, OpenAI). `read`/`write`/`delete`/`hasValue`. Writing an empty string deletes. |
 | `ChatClient.swift` | ~75 | `ChatClient` protocol shared by the chat backends, plus `ChatClientFactory.makeClient(from:)` which picks the implementation from `AppSettings`. |
 | `OpenAICompatibleChatClient.swift` | ~190 | Streaming vision chat for any OpenAI-style `/chat/completions` endpoint (OpenRouter, Ollama, LM Studio…). Images sent as base64 data-URI `image_url` parts; parses `choices[0].delta.content` SSE. |
+| `OllamaModelWarmer.swift` | ~65 | Fire-and-forget preload of the selected Ollama model with `keep_alive: -1` via the native `/api/generate` endpoint (the `/v1` endpoint ignores keep_alive). Called by `ChatClientFactory` whenever the Ollama provider is built. |
 | `TTSClient.swift` | ~40 | `TTSClient` protocol (`speakText`, `isPlaying`, `stopPlayback`) plus `TTSClientFactory`. |
 | `AppleSpeechTTSClient.swift` | ~80 | On-device TTS via `AVSpeechSynthesizer`. Default. Tracks `isPlaying` through the synthesizer delegate. |
 | `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |

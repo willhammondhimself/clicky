@@ -55,6 +55,15 @@ enum ChatClientFactory {
             return ClaudeAPI(apiKey: apiKey, model: appSettings.chatModel)
 
         case .openRouter, .ollama, .custom:
+            if providerKind == .ollama {
+                // Load the model now and keep it resident so the first
+                // question isn't stuck behind a cold model load.
+                OllamaModelWarmer.preloadAndPin(
+                    openAICompatibleBaseURL: appSettings.chatBaseURL,
+                    model: appSettings.chatModel
+                )
+            }
+
             // OpenRouter asks for these so usage shows up under your app name
             // in their dashboard. Harmless for other providers, so only set
             // them where they mean something.
