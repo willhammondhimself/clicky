@@ -36,7 +36,7 @@ enum ChatProviderKind: String, CaseIterable, Identifiable {
     var defaultBaseURL: String {
         switch self {
         case .openRouter: return "https://openrouter.ai/api/v1"
-        case .ollama: return "http://localhost:11434/v1"
+        case .ollama: return "http://127.0.0.1:11434/v1"
         case .anthropicDirect: return "https://api.anthropic.com/v1/messages"
         case .custom: return "http://localhost:8080/v1"
         }
