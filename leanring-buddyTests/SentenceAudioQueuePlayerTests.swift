@@ -7,6 +7,9 @@ import Testing
 @testable import ClickyLogic
 #endif
 
+/// The player is main-actor isolated and the Xcode test target has no
+/// default isolation, so the suite runs on the main actor explicitly.
+@MainActor
 struct SentenceAudioQueuePlayerTests {
 
     private func silentBuffer(seconds: Double) -> AVAudioPCMBuffer {

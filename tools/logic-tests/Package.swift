@@ -5,14 +5,21 @@
 // app's TCC permissions), so files with no AppKit/FluidAudio dependency are
 // symlinked into this package and tested with `swift test`.
 //
-// Settings mirror the app target: Swift 5 language mode with main-actor
-// default isolation, so code that compiles here compiles in the app.
+// Settings mirror the Xcode targets exactly: the app target compiles with
+// Swift 5 language mode and main-actor default isolation; the unit-test
+// target (leanring-buddyTests) has Swift 5 language mode but NO default
+// isolation. Keeping that asymmetry here means a test that would fail to
+// compile under Cmd+U also fails here.
 
 import PackageDescription
 
 let mirroredAppTargetSettings: [SwiftSetting] = [
     .swiftLanguageMode(.v5),
     .defaultIsolation(MainActor.self),
+]
+
+let mirroredTestTargetSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v5),
 ]
 
 let package = Package(
@@ -26,7 +33,7 @@ let package = Package(
         .testTarget(
             name: "ClickyLogicTests",
             dependencies: ["ClickyLogic"],
-            swiftSettings: mirroredAppTargetSettings
+            swiftSettings: mirroredTestTargetSettings
         ),
     ]
 )
