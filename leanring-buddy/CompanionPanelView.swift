@@ -632,6 +632,8 @@ struct CompanionPanelView: View {
 
                 settingsPickerRow(title: "Text to speech", selection: $appSettings.textToSpeechProviderKind)
                 switch appSettings.textToSpeechProviderKind {
+                case .kokoro:
+                    kokoroVoicePickerRow
                 case .apple:
                     appleVoicePickerRow
                 case .elevenLabs:
@@ -639,7 +641,7 @@ struct CompanionPanelView: View {
                     settingsTextFieldRow(title: "Voice ID", text: $appSettings.elevenLabsVoiceID, placeholder: AppSettings.defaultElevenLabsVoiceID)
                 }
 
-                Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Apple to run fully offline.")
+                Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Kokoro to run fully offline.")
                     .font(.system(size: 10))
                     .foregroundColor(DS.Colors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -748,6 +750,23 @@ struct CompanionPanelView: View {
                 Text("System default").tag("")
                 ForEach(availableVoices, id: \.identifier) { voice in
                     Text(appleVoiceLabel(for: voice)).tag(voice.identifier)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 190)
+        }
+    }
+
+    private var kokoroVoicePickerRow: some View {
+        HStack {
+            Text("Voice")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+            Spacer()
+            Picker("", selection: $appSettings.kokoroVoice) {
+                ForEach(KokoroVoiceCatalog.availableVoices()) { voiceOption in
+                    Text(voiceOption.label).tag(voiceOption.id)
                 }
             }
             .pickerStyle(.menu)

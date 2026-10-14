@@ -6,7 +6,7 @@
 //  UserDefaults; API keys are NOT stored here (see SecretsStore).
 //
 //  Defaults are chosen so a fresh install works with zero accounts:
-//  Apple Speech (STT) → Ollama on localhost (vision LLM) → Apple voices (TTS).
+//  Apple Speech (STT) → Ollama on localhost (vision LLM) → Kokoro (TTS).
 //
 
 import AVFoundation
@@ -90,6 +90,7 @@ enum SpeechToTextProviderKind: String, CaseIterable, Identifiable {
 }
 
 enum TextToSpeechProviderKind: String, CaseIterable, Identifiable {
+    case kokoro
     case apple
     case elevenLabs = "elevenlabs"
 
@@ -97,6 +98,7 @@ enum TextToSpeechProviderKind: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .kokoro: return "Kokoro (local)"
         case .apple: return "Apple (local)"
         case .elevenLabs: return "ElevenLabs"
         }
@@ -104,7 +106,7 @@ enum TextToSpeechProviderKind: String, CaseIterable, Identifiable {
 
     var secretKey: SecretsStore.Key? {
         switch self {
-        case .apple: return nil
+        case .kokoro, .apple: return nil
         case .elevenLabs: return .elevenLabs
         }
     }
@@ -125,6 +127,7 @@ final class AppSettings: ObservableObject {
         static let textToSpeechProvider = "settings.textToSpeechProvider"
         static let appleVoiceIdentifier = "settings.appleVoiceIdentifier"
         static let elevenLabsVoiceID = "settings.elevenLabsVoiceID"
+        static let kokoroVoice = "settings.kokoroVoice"
     }
 
     /// Voice ID Farza shipped with; kept as the default so ElevenLabs works
@@ -170,6 +173,11 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(elevenLabsVoiceID, forKey: Keys.elevenLabsVoiceID) }
     }
 
+    /// Kokoro voice code, e.g. `bm_george`. See `KokoroVoiceCatalog`.
+    @Published var kokoroVoice: String {
+        didSet { userDefaults.set(kokoroVoice, forKey: Keys.kokoroVoice) }
+    }
+
     private init() {
         let storedChatProvider = userDefaults.string(forKey: Keys.chatProvider)
             .flatMap(ChatProviderKind.init(rawValue:)) ?? .ollama
@@ -180,10 +188,11 @@ final class AppSettings: ObservableObject {
         speechToTextProviderKind = userDefaults.string(forKey: Keys.speechToTextProvider)
             .flatMap(SpeechToTextProviderKind.init(rawValue:)) ?? .apple
         textToSpeechProviderKind = userDefaults.string(forKey: Keys.textToSpeechProvider)
-            .flatMap(TextToSpeechProviderKind.init(rawValue:)) ?? .apple
+            .flatMap(TextToSpeechProviderKind.init(rawValue:)) ?? .kokoro
 
         appleVoiceIdentifier = userDefaults.string(forKey: Keys.appleVoiceIdentifier) ?? ""
         elevenLabsVoiceID = userDefaults.string(forKey: Keys.elevenLabsVoiceID) ?? Self.defaultElevenLabsVoiceID
+        kokoroVoice = userDefaults.string(forKey: Keys.kokoroVoice) ?? KokoroVoiceCatalog.defaultVoice
 
         // The upstream app stored a bare Claude model name here. It doesn't map
         // onto any of the new providers, so just clear it.

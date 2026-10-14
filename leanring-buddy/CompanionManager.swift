@@ -75,7 +75,7 @@ final class CompanionManager: ObservableObject {
     /// the API directly with a key from the Keychain — no proxy.
     private var chatClient: any ChatClient = ChatClientFactory.makeClient(from: AppSettings.shared)
 
-    /// Text-to-speech backend (Apple on-device by default, ElevenLabs opt-in).
+    /// Text-to-speech backend (Kokoro on-device by default; Apple and ElevenLabs selectable).
     private var textToSpeechClient: any TTSClient = TTSClientFactory.makeClient(from: AppSettings.shared)
 
     private var settingsObservationCancellables: Set<AnyCancellable> = []
@@ -98,14 +98,15 @@ final class CompanionManager: ObservableObject {
             appSettings.$chatBaseURL.map { _ in () },
             appSettings.$chatModel.map { _ in () }
         )
-        let voiceSettingsChanged = Publishers.Merge3(
+        let voiceSettingsChanged = Publishers.Merge4(
             appSettings.$textToSpeechProviderKind.map { _ in () },
             appSettings.$appleVoiceIdentifier.map { _ in () },
-            appSettings.$elevenLabsVoiceID.map { _ in () }
+            appSettings.$elevenLabsVoiceID.map { _ in () },
+            appSettings.$kokoroVoice.map { _ in () }
         )
 
         Publishers.Merge(chatSettingsChanged, voiceSettingsChanged)
-            .dropFirst(6) // skip the initial value each of the six publishers emits on subscribe
+            .dropFirst(7) // skip the initial value each of the seven publishers emits on subscribe
             .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
             .sink { [weak self] in
                 self?.rebuildClientsFromSettings()

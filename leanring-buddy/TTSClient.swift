@@ -25,6 +25,9 @@ enum TTSClientFactory {
     @MainActor
     static func makeClient(from appSettings: AppSettings) -> any TTSClient {
         switch appSettings.textToSpeechProviderKind {
+        case .kokoro:
+            // Temporary: replaced by KokoroTTSClient once the engine exists.
+            return AppleSpeechTTSClient(voiceIdentifier: appSettings.appleVoiceIdentifier)
         case .apple:
             return AppleSpeechTTSClient(voiceIdentifier: appSettings.appleVoiceIdentifier)
         case .elevenLabs:
