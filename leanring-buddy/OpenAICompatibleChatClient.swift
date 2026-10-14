@@ -14,6 +14,7 @@ final class OpenAICompatibleChatClient: ChatClient {
     private let chatCompletionsURL: URL
     private let apiKey: String?
     private let extraHeaders: [String: String]
+    private let disablesModelThinking: Bool
     private let session: URLSession
     var model: String
 
@@ -21,7 +22,17 @@ final class OpenAICompatibleChatClient: ChatClient {
     ///   - baseURL: e.g. `https://openrouter.ai/api/v1` or `http://localhost:11434/v1`.
     ///     `/chat/completions` is appended here.
     ///   - apiKey: sent as a Bearer token when present. Ollama needs none.
-    init(baseURL: String, apiKey: String?, model: String, extraHeaders: [String: String] = [:]) {
+    ///   - disablesModelThinking: sends `reasoning_effort: "none"`. Needed for
+    ///     Ollama, where models like gemma4 think by default and otherwise spend
+    ///     the whole `max_tokens` budget reasoning and return empty text. Not
+    ///     sent to other providers, some of which reject the value.
+    init(
+        baseURL: String,
+        apiKey: String?,
+        model: String,
+        extraHeaders: [String: String] = [:],
+        disablesModelThinking: Bool = false
+    ) {
         let trimmedBaseURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let baseURLWithoutTrailingSlash = trimmedBaseURL.hasSuffix("/")
             ? String(trimmedBaseURL.dropLast())
@@ -31,6 +42,7 @@ final class OpenAICompatibleChatClient: ChatClient {
         self.apiKey = apiKey
         self.model = model
         self.extraHeaders = extraHeaders
+        self.disablesModelThinking = disablesModelThinking
 
         // Same session tuning as ClaudeAPI: keep TLS tickets cached so large
         // image payloads don't hit cold-handshake failures, but never cache
@@ -104,12 +116,15 @@ final class OpenAICompatibleChatClient: ChatClient {
         ])
         messages.append(["role": "user", "content": userContentParts])
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "max_tokens": 1024,
             "stream": true,
             "messages": messages
         ]
+        if disablesModelThinking {
+            body["reasoning_effort"] = "none"
+        }
 
         var request = makeAPIRequest()
         let bodyData = try JSONSerialization.data(withJSONObject: body)

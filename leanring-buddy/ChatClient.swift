@@ -67,7 +67,10 @@ enum ChatClientFactory {
                 baseURL: appSettings.chatBaseURL,
                 apiKey: apiKey,
                 model: appSettings.chatModel,
-                extraHeaders: extraHeaders
+                extraHeaders: extraHeaders,
+                // Local models (gemma4, qwen3…) think by default and would
+                // otherwise return empty replies; see the client's doc comment.
+                disablesModelThinking: providerKind == .ollama
             )
         }
     }
