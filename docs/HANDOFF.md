@@ -30,6 +30,10 @@ On `feature/kokoro-tts`:
 | `88fdcdd` | `KokoroTTSClient` + factory case with warm-up |
 | `5a32ced` | Model status row with Retry in AI Settings |
 | `6115278` | Throwaway warm-up synthesis after load (first real synthesis was ~9 s otherwise) |
+| `e89e1b8` | Player test suite on the main actor (Xcode test target has no main-actor default); harness test target now mirrors that |
+| fix pass | `KokoroModelLoadCoordinator` (single in-flight load, retry on a new voice), `KokoroSentenceSynthesizing` protocol, `TTSClientFactory.swift` split out, cancelled-reply `isPlaying` fix; +10 tests (36 total) |
+
+Review findings deferred as minor (see the plan's ledger in git history of this file's commit): the `.loading` status copy says "downloading… ~300 MB" even on warm loads; an unknown stored voice code shows a blank picker; no `AVAudioEngineConfigurationChange` handling in the queue player; no sample-rate guard before `scheduleBuffer`.
 
 ### Settings model
 
@@ -38,7 +42,7 @@ All in the panel's **AI Settings**, persisted in UserDefaults via `AppSettings`;
 - STT: `SpeechToTextProviderKind` = apple (default) | assemblyAI | openAI
 - TTS: `TextToSpeechProviderKind` = kokoro (default) | apple | elevenLabs; Kokoro voice picker (28 voices, default `bm_george`) with model-status row; Apple voice picker; ElevenLabs voice ID
 
-Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB after first run). Delete that folder to re-test the cold path.
+Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB after first run); FluidAudio keeps its English pronunciation assets (~40 MB) in `~/.cache/fluidaudio/Models/kokoro` regardless of the directory setting. Delete both to re-test the cold path.
 
 ## Conventions that bite
 

@@ -16,7 +16,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 - **Pattern**: MVVM with `@StateObject` / `@Published` state management
 - **AI Chat**: pluggable `ChatClient` — `OpenAICompatibleChatClient` (OpenRouter, Ollama, any `/chat/completions` server; default Ollama `gemma4:26b`) or `ClaudeAPI` (Anthropic Messages API direct). SSE streaming. Chosen in `AppSettings.chatProviderKind`.
 - **Speech-to-Text**: pluggable `BuddyTranscriptionProvider` — Apple Speech on-device (default), AssemblyAI real-time streaming (`u3-rt-pro`), or OpenAI upload. Chosen in `AppSettings.speechToTextProviderKind`.
-- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio Swift package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`. Kokoro models (~380 MB) download once from Hugging Face into `~/Library/Application Support/Clicky/Models`; `KokoroVoiceEngine` is a singleton so they load once per app run.
+- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio Swift package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`. Kokoro models (~380 MB) download once from Hugging Face into `~/Library/Application Support/Clicky/Models` (plus ~40 MB of pronunciation assets in FluidAudio's own `~/.cache/fluidaudio`); `KokoroVoiceEngine` is a singleton so they load once per app run.
 - **Settings & Secrets**: `AppSettings` (UserDefaults-backed `ObservableObject`) for provider/model/voice choices; `SecretsStore` (Keychain, service `com.willhammond.clicky`) for API keys. `CompanionManager` observes `AppSettings` and rebuilds clients on change.
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
@@ -48,9 +48,13 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 | `ChatClient.swift` | ~75 | `ChatClient` protocol shared by the chat backends, plus `ChatClientFactory.makeClient(from:)` which picks the implementation from `AppSettings`. |
 | `OpenAICompatibleChatClient.swift` | ~190 | Streaming vision chat for any OpenAI-style `/chat/completions` endpoint (OpenRouter, Ollama, LM Studio…). Images sent as base64 data-URI `image_url` parts; parses `choices[0].delta.content` SSE. |
 | `OllamaModelWarmer.swift` | ~65 | Fire-and-forget preload of the selected Ollama model with `keep_alive: -1` via the native `/api/generate` endpoint (the `/v1` endpoint ignores keep_alive). Called by `ChatClientFactory` whenever the Ollama provider is built. |
-| `TTSClient.swift` | ~40 | `TTSClient` protocol (`speakText`, `isPlaying`, `stopPlayback`) plus `TTSClientFactory`. |
+| `TTSClient.swift` | ~25 | `TTSClient` protocol (`speakText`, `isPlaying`, `stopPlayback`). |
+| `TTSClientFactory.swift` | ~40 | `TTSClientFactory.makeClient(from:)` — picks Kokoro/Apple/ElevenLabs from `AppSettings`; fires the Kokoro warm-up. |
+| `KokoroModelLoadCoordinator.swift` | ~95 | FluidAudio-free load sequencing: one in-flight load, late callers wait and re-check, failure sticky per voice (a different voice retries; `retryLoad` for the same). Unit-tested. |
+| `KokoroModelLoadState.swift` | ~20 | `notLoaded/loading/ready/failed/unavailable`. |
+| `KokoroSentenceSynthesizing.swift` | ~25 | Protocol the client uses for the engine, so tests can substitute a fake. |
 | `AppleSpeechTTSClient.swift` | ~80 | On-device TTS via `AVSpeechSynthesizer`. Zero-download fallback. Tracks `isPlaying` through the synthesizer delegate. |
-| `KokoroVoiceEngine.swift` | ~140 | Singleton owning the FluidAudio `KokoroAneManager`. Published `loadState` (`notLoaded/loading/ready/failed/unavailable`), model dir `~/Library/Application Support/Clicky/Models`, warm-up synthesis after load, sentence → 24 kHz PCM buffer. |
+| `KokoroVoiceEngine.swift` | ~130 | Singleton owning the FluidAudio `KokoroAneManager`; conforms to `KokoroSentenceSynthesizing`. Delegates load sequencing to `KokoroModelLoadCoordinator`, republishes `loadState`, runs a warm-up synthesis after load, sentence → 24 kHz PCM buffer. |
 | `KokoroTTSClient.swift` | ~130 | `TTSClient` for Kokoro (default): sentence split → synthesize → gapless queue; speaks with the Apple voice when the model can't load. |
 | `SentenceAudioQueuePlayer.swift` | ~90 | `AVAudioEngine`/`AVAudioPlayerNode` queue for PCM buffers with generation-guarded `isPlaying` and `stop()`. |
 | `SentenceSplitter.swift` | ~140 | Pure sentence chunker for TTS (merge pieces under 20 chars, split over 300 at a comma). Unit-tested. |
