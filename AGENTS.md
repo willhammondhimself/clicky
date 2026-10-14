@@ -5,7 +5,7 @@
 
 ## Overview
 
-macOS menu bar companion app. Lives entirely in the macOS status bar (no dock icon, no main window). Clicking the menu bar icon opens a custom floating panel with companion voice controls and AI settings. Uses push-to-talk (ctrl+option) to capture voice input, transcribes it via the configured STT provider (Apple Speech by default), and sends the transcript + a screenshot of the user's screen to the configured vision chat model (Ollama on localhost by default; OpenRouter/Anthropic/custom opt-in). The model responds with text (streamed via SSE) which is spoken via the configured TTS provider (Apple voices by default; ElevenLabs opt-in). A blue cursor overlay can fly to and point at UI elements the model references on any connected monitor.
+macOS menu bar companion app. Lives entirely in the macOS status bar (no dock icon, no main window). Clicking the menu bar icon opens a custom floating panel with companion voice controls and AI settings. Uses push-to-talk (ctrl+option) to capture voice input, transcribes it via the configured STT provider (Apple Speech by default), and sends the transcript + a screenshot of the user's screen to the configured vision chat model (Ollama on localhost by default; OpenRouter/Anthropic/custom opt-in). The model responds with text (streamed via SSE) which is spoken via the configured TTS provider (Kokoro on-device by default; Apple voices and ElevenLabs selectable). A blue cursor overlay can fly to and point at UI elements the model references on any connected monitor.
 
 This fork calls provider APIs directly. API keys are stored in the macOS Keychain (`SecretsStore`) and entered through the in-app settings panel; nothing sensitive ships in the app. There is no proxy server and no telemetry.
 
@@ -16,7 +16,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 - **Pattern**: MVVM with `@StateObject` / `@Published` state management
 - **AI Chat**: pluggable `ChatClient` — `OpenAICompatibleChatClient` (OpenRouter, Ollama, any `/chat/completions` server; default Ollama `gemma4:26b`) or `ClaudeAPI` (Anthropic Messages API direct). SSE streaming. Chosen in `AppSettings.chatProviderKind`.
 - **Speech-to-Text**: pluggable `BuddyTranscriptionProvider` — Apple Speech on-device (default), AssemblyAI real-time streaming (`u3-rt-pro`), or OpenAI upload. Chosen in `AppSettings.speechToTextProviderKind`.
-- **Text-to-Speech**: pluggable `TTSClient` — `AppleSpeechTTSClient` (AVSpeechSynthesizer, default) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`.
+- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio Swift package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`. Kokoro models (~380 MB) download once from Hugging Face into `~/Library/Application Support/Clicky/Models`; `KokoroVoiceEngine` is a singleton so they load once per app run.
 - **Settings & Secrets**: `AppSettings` (UserDefaults-backed `ObservableObject`) for provider/model/voice choices; `SecretsStore` (Keychain, service `com.willhammond.clicky`) for API keys. `CompanionManager` observes `AppSettings` and rebuilds clients on change.
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
@@ -43,15 +43,21 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 |------|-------|---------|
 | `leanring_buddyApp.swift` | ~89 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. No main window — the app lives entirely in the status bar. |
 | `CompanionManager.swift` | ~1060 | Central state machine. Owns dictation, shortcut monitoring, screen capture, the active `ChatClient` and `TTSClient`, and overlay management. Observes `AppSettings` and rebuilds clients on change (`rebuildClientsFromSettings`). Tracks voice state (idle/listening/processing/responding), conversation history, and cursor visibility. Coordinates the full push-to-talk → screenshot → chat → TTS → pointing pipeline. |
-| `AppSettings.swift` | ~230 | `@MainActor ObservableObject` singleton over UserDefaults: chat provider kind/base URL/model, STT provider, TTS provider, Apple voice id, ElevenLabs voice id. Defines the `ChatProviderKind`, `SpeechToTextProviderKind`, `TextToSpeechProviderKind` enums with their defaults. |
+| `AppSettings.swift` | ~240 | `@MainActor ObservableObject` singleton over UserDefaults: chat provider kind/base URL/model, STT provider, TTS provider (default `kokoro`), Kokoro voice, Apple voice id, ElevenLabs voice id. Defines the `ChatProviderKind`, `SpeechToTextProviderKind`, `TextToSpeechProviderKind` enums with their defaults. |
 | `SecretsStore.swift` | ~110 | Keychain wrapper for API keys (OpenRouter, Anthropic, AssemblyAI, ElevenLabs, OpenAI). `read`/`write`/`delete`/`hasValue`. Writing an empty string deletes. |
 | `ChatClient.swift` | ~75 | `ChatClient` protocol shared by the chat backends, plus `ChatClientFactory.makeClient(from:)` which picks the implementation from `AppSettings`. |
 | `OpenAICompatibleChatClient.swift` | ~190 | Streaming vision chat for any OpenAI-style `/chat/completions` endpoint (OpenRouter, Ollama, LM Studio…). Images sent as base64 data-URI `image_url` parts; parses `choices[0].delta.content` SSE. |
 | `OllamaModelWarmer.swift` | ~65 | Fire-and-forget preload of the selected Ollama model with `keep_alive: -1` via the native `/api/generate` endpoint (the `/v1` endpoint ignores keep_alive). Called by `ChatClientFactory` whenever the Ollama provider is built. |
 | `TTSClient.swift` | ~40 | `TTSClient` protocol (`speakText`, `isPlaying`, `stopPlayback`) plus `TTSClientFactory`. |
-| `AppleSpeechTTSClient.swift` | ~80 | On-device TTS via `AVSpeechSynthesizer`. Default. Tracks `isPlaying` through the synthesizer delegate. |
+| `AppleSpeechTTSClient.swift` | ~80 | On-device TTS via `AVSpeechSynthesizer`. Zero-download fallback. Tracks `isPlaying` through the synthesizer delegate. |
+| `KokoroVoiceEngine.swift` | ~140 | Singleton owning the FluidAudio `KokoroAneManager`. Published `loadState` (`notLoaded/loading/ready/failed/unavailable`), model dir `~/Library/Application Support/Clicky/Models`, warm-up synthesis after load, sentence → 24 kHz PCM buffer. |
+| `KokoroTTSClient.swift` | ~130 | `TTSClient` for Kokoro (default): sentence split → synthesize → gapless queue; speaks with the Apple voice when the model can't load. |
+| `SentenceAudioQueuePlayer.swift` | ~90 | `AVAudioEngine`/`AVAudioPlayerNode` queue for PCM buffers with generation-guarded `isPlaying` and `stop()`. |
+| `SentenceSplitter.swift` | ~140 | Pure sentence chunker for TTS (merge pieces under 20 chars, split over 300 at a comma). Unit-tested. |
+| `KokoroVoiceCatalog.swift` | ~80 | The 28 American/British Kokoro voice codes with readable labels; default `bm_george`. Unit-tested. |
+| `KokoroOperatingSystemSupport.swift` | ~35 | Blocks Kokoro on macOS 26.4–26.5 (Apple BNNS crash bug, fixed in 26.6); v3 runtime availability. Unit-tested. |
 | `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |
-| `CompanionPanelView.swift` | ~960 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, the collapsible **AI Settings** section (provider/model/base URL, STT + TTS pickers, Apple voice picker, Keychain-backed API key fields with Save), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
+| `CompanionPanelView.swift` | ~960 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, the collapsible **AI Settings** section (provider/model/base URL, STT + TTS pickers, Kokoro voice picker with model-status row and Retry, Apple voice picker, Keychain-backed API key fields with Save), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
 | `OverlayWindow.swift` | ~881 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
 | `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
 | `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
@@ -90,9 +96,24 @@ open leanring-buddy.xcodeproj
 To catch compile errors from the terminal without producing an app bundle (and therefore without disturbing TCC permissions):
 
 ```bash
-xcrun swiftc -typecheck -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
-  -target arm64-apple-macos14.2 -parse-as-library leanring-buddy/*.swift
+tools/typecheck.sh      # prints "typecheck: 0 errors" on success
 ```
+
+It runs `swiftc -typecheck` with the app's settings (macOS 14.2, main-actor default isolation) and, once Xcode has built the project at least once, points the compiler at the FluidAudio module in DerivedData so files that `import FluidAudio` typecheck too.
+
+## Terminal tests
+
+Pure-logic files (no AppKit/FluidAudio imports) are symlinked into a small SwiftPM package so their Swift Testing suites run from the terminal:
+
+```bash
+cd tools/logic-tests && swift test
+```
+
+After adding a new symlink, delete `tools/logic-tests/.build` once — SwiftPM caches the source list. Test files live in `leanring-buddyTests/` and import the module conditionally (`leanring_buddy` in Xcode, `ClickyLogic` in the harness), so Cmd+U runs the same tests.
+
+## Xcode MCP
+
+Xcode 26.3+ ships an MCP server (`xcrun mcpbridge`). It is registered for Claude Code at user scope; enable it in Xcode → Settings → Intelligence (Enable Model Context Protocol + Xcode Tools) so an agent can build, test and read issues through Xcode itself without touching TCC.
 
 ## Configuration
 

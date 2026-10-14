@@ -16,7 +16,7 @@ Success looks like: hold the hotkey, ask a question, and hear a British male Kok
 | First run (model download + compile) | Block: the spinner stays up until the model is ready, then the reply is spoken in Kokoro. The engine also warms at launch so this rarely happens. |
 | Default | Kokoro is the fresh-install default. Existing installs keep their stored choice. |
 | Dependency | Claude edits `project.pbxproj` to add the FluidAudio package pinned to 0.17.7; Will's Cmd+R resolves it. |
-| Voice | JARVIS-like British male. Default `bm_george`. All 54 English voices selectable. |
+| Voice | JARVIS-like British male. Default `bm_george`. The 28 American/British voices are selectable (FluidAudio's `englishVoices` list also contains other-language packs, which are excluded). |
 | Not in scope | Voice cloning (Chatterbox), speaking while the model is still streaming, a "chooser" model (OpenJev-style option scoring) — that one is a fit for accessibility-tree pointing later, not for TTS. |
 
 ## Verified facts about FluidAudio (read from the package source, 2026-10-14)
@@ -33,7 +33,7 @@ Success looks like: hold the hotkey, ask a question, and hear a British male Kok
 
 ## Architecture
 
-Three new source files plus one pure helper, all in `leanring-buddy/`, following the existing `TTSClient` protocol and the "factory builds a client from `AppSettings`" pattern. `CompanionManager` is not modified.
+Three new source files plus pure helpers, all in `leanring-buddy/`, following the existing `TTSClient` protocol and the "factory builds a client from `AppSettings`" pattern. `CompanionManager` only gains the `kokoroVoice` publisher in `bindSettingsObservation`. (Implementation note: the voice list and labels live in `KokoroVoiceCatalog`, not `AppSettings`, so they stay free of the FluidAudio import and run in the terminal test harness; the engine also runs one throwaway synthesis after load because the first call otherwise pays ~9 s for the lexicon load and Neural Engine compile.)
 
 ### `KokoroVoiceEngine` (new file)
 

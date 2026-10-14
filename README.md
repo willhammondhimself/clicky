@@ -10,7 +10,7 @@ Upstream routed every API call through a Cloudflare Worker that held the keys. T
 
 - **Calls providers directly.** No Worker, no Cloudflare account. API keys go in the in-app **AI Settings** panel and are stored in the macOS Keychain.
 - **Is provider-agnostic.** The chat model can be any OpenAI-compatible endpoint (OpenRouter, Ollama, LM Studio, vLLM…) or Anthropic directly. One OpenRouter key reaches Haiku 5.5, DeepSeek, GLM, Qwen-VL, Gemini, etc.
-- **Runs fully offline by default.** Fresh install = Apple Speech (STT) → Ollama on localhost (vision LLM) → Apple voices (TTS). Zero accounts needed. AssemblyAI and ElevenLabs are opt-in toggles.
+- **Runs fully offline by default.** Fresh install = Apple Speech (STT) → Ollama on localhost (vision LLM) → Kokoro (local neural TTS, one-time ~380 MB model download). Zero accounts needed. AssemblyAI and ElevenLabs are opt-in toggles.
 - **Phones home to nobody.** Upstream's PostHog telemetry, FormSpark email capture and Sparkle update feed are removed.
 
 Everything else — the overlay, pointing animation, screen capture, push-to-talk — is Farza's code.
@@ -39,7 +39,7 @@ Do not build with `xcodebuild` from the terminal — it invalidates the TCC perm
 2. Expand **AI Settings** in the panel:
    - **Provider** — `Ollama (local)` with model `gemma4:26b` is the default. Switch to `OpenRouter`, paste a key, click Save; the model defaults to `anthropic/claude-haiku-5.5`.
    - **Speech to text** — Apple (local) by default. AssemblyAI / OpenAI need a key.
-   - **Text to speech** — Apple (local) by default. For a less robotic voice, download an *Enhanced* or *Premium* voice in System Settings → Accessibility → Spoken Content → System Voice → Manage Voices, then pick it in the Voice menu. ElevenLabs needs a key.
+   - **Text to speech** — Kokoro (local) by default: a British male voice out of the box, 28 voices in the menu, models download once from Hugging Face on first use (the status line under the Voice menu shows progress). Apple voices need no download (pick an *Enhanced*/*Premium* voice in System Settings → Accessibility → Spoken Content for best results). ElevenLabs needs a key.
 3. Hold **Control + Option**, ask something about your screen, release.
 
 Keys are read from the Keychain (service `com.willhammond.clicky`). `.env.example` documents them but is never read by the app.
@@ -57,7 +57,12 @@ leanring-buddy/
   OpenAICompatibleChatClient.swift  # OpenRouter / Ollama / any /chat/completions server
   ClaudeAPI.swift                   # Anthropic Messages API (direct)
   TTSClient.swift                   # protocol + factory
-  AppleSpeechTTSClient.swift        # AVSpeechSynthesizer (default)
+  KokoroTTSClient.swift             # Kokoro on-device (default): sentence queue + Apple fallback
+  KokoroVoiceEngine.swift           # owns the FluidAudio Kokoro model; load state
+  SentenceAudioQueuePlayer.swift    # gapless AVAudioEngine playback of sentence buffers
+  SentenceSplitter.swift            # sentence chunking for TTS (unit-tested)
+  KokoroVoiceCatalog.swift          # voice codes + labels (unit-tested)
+  AppleSpeechTTSClient.swift        # AVSpeechSynthesizer (zero-download fallback)
   ElevenLabsTTSClient.swift         # ElevenLabs (direct)
   BuddyTranscriptionProvider.swift  # STT protocol + factory (Apple / AssemblyAI / OpenAI)
   CompanionPanelView.swift          # menu bar panel incl. AI Settings
