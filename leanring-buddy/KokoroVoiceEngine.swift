@@ -85,9 +85,15 @@ final class KokoroVoiceEngine: ObservableObject {
         let loadTask = Task { [weak self] in
             do {
                 try await manager.initialize(preloadVoices: [voice])
+                // The first synthesis pays for the pronunciation lexicon
+                // (178k entries) and the Neural Engine kernel compile —
+                // around 9 s on Will's M4 Pro. Spend it now, while nobody is
+                // waiting, instead of on the first real reply.
+                let warmUpStart = Date()
+                _ = try await manager.synthesizeDetailed(text: "ready.", voice: voice)
                 self?.preloadedVoices.insert(voice)
                 self?.loadState = .ready
-                print("🔊 Kokoro: model ready, voice \(voice) loaded")
+                print("🔊 Kokoro: model ready, voice \(voice) loaded (warm-up synthesis \(String(format: "%.1f", Date().timeIntervalSince(warmUpStart))) s)")
             } catch {
                 self?.loadState = .failed(message: "couldn't load the kokoro voice model: \(error.localizedDescription)")
                 print("⚠️ Kokoro load failed: \(error)")
