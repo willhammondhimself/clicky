@@ -13,6 +13,7 @@ import SwiftUI
 struct CompanionPanelView: View {
     @ObservedObject var companionManager: CompanionManager
     @ObservedObject private var appSettings = AppSettings.shared
+    @ObservedObject private var kokoroVoiceEngine = KokoroVoiceEngine.shared
     @State private var emailInput: String = ""
     @State private var isAISettingsExpanded: Bool = false
     /// Draft text for each API key field. Keys are written to the Keychain
@@ -634,6 +635,7 @@ struct CompanionPanelView: View {
                 switch appSettings.textToSpeechProviderKind {
                 case .kokoro:
                     kokoroVoicePickerRow
+                    kokoroModelStatusRow
                 case .apple:
                     appleVoicePickerRow
                 case .elevenLabs:
@@ -773,6 +775,44 @@ struct CompanionPanelView: View {
             .labelsHidden()
             .frame(maxWidth: 190)
         }
+    }
+
+    /// One line under the voice picker so the first-run download isn't a
+    /// mystery: downloading → ready, or the error with a Retry button.
+    private var kokoroModelStatusRow: some View {
+        HStack(spacing: 6) {
+            switch kokoroVoiceEngine.loadState {
+            case .notLoaded:
+                kokoroStatusText("voice model loads on first use")
+            case .loading:
+                ProgressView()
+                    .controlSize(.mini)
+                kokoroStatusText("downloading voice model… (one time, ~300 MB)")
+            case .ready:
+                kokoroStatusText("voice model ready")
+            case .failed(let message):
+                kokoroStatusText(message)
+                Button("Retry") {
+                    Task {
+                        await kokoroVoiceEngine.retryLoad(preloadingVoice: appSettings.kokoroVoice)
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(DS.Colors.textSecondary)
+                .pointerCursor()
+            case .unavailable(let reason):
+                kokoroStatusText(reason)
+            }
+            Spacer()
+        }
+    }
+
+    private func kokoroStatusText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10))
+            .foregroundColor(DS.Colors.textTertiary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func appleVoiceLabel(for voice: AVSpeechSynthesisVoice) -> String {
