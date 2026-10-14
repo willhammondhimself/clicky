@@ -63,7 +63,10 @@ final class SentenceAudioQueuePlayer {
         scheduledBufferCount += 1
         let generationWhenScheduled = playbackGeneration
         playerNode.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
-            Task { @MainActor in
+            // Explicit capture: the Task closure must copy the weak reference
+            // rather than capture the outer closure's `self` binding by
+            // reference, which Swift 6 flags as a concurrency error.
+            Task { @MainActor [weak self] in
                 guard let self, self.playbackGeneration == generationWhenScheduled else { return }
                 self.scheduledBufferCount = max(0, self.scheduledBufferCount - 1)
             }
