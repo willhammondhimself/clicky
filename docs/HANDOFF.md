@@ -1,6 +1,6 @@
 # HANDOFF — read this first after a context reset
 
-Last updated: 2026-10-15. Branch `feature/kokoro-tts` (off `feature/direct-providers`), pushed to `willhammondhimself/clicky`.
+Last updated: 2026-10-15. The Kokoro work (`feature/kokoro-tts`) is merged into `feature/direct-providers` (fast-forward, head `6a00780`) and pushed to `willhammondhimself/clicky`; the local feature branch is deleted. Start the next feature on a new `feature/...` branch off `feature/direct-providers`.
 
 ## Where we are
 
