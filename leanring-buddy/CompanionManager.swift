@@ -78,6 +78,9 @@ final class CompanionManager: ObservableObject {
     /// Text-to-speech backend (Kokoro on-device by default; Apple and ElevenLabs selectable).
     private var textToSpeechClient: any TTSClient = TTSClientFactory.makeClient(from: AppSettings.shared)
 
+    /// Profile + daily notes on disk, injected into the system prompt.
+    private let memoryManager = MemoryManager.shared
+
     private var settingsObservationCancellables: Set<AnyCancellable> = []
 
     /// Recreates the chat and TTS clients from the current settings. Called
@@ -200,6 +203,7 @@ final class CompanionManager: ObservableObject {
         bindAudioPowerLevel()
         bindShortcutTransitions()
         bindSettingsObservation()
+        memoryManager.prepareAtLaunch()
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
@@ -594,6 +598,37 @@ final class CompanionManager: ObservableObject {
     - element is on screen 2 (not where cursor is): "that's over on your other monitor — see the terminal window? [POINT:400,300:terminal:screen2]"
     """
 
+    /// Appended to the prompt above only while memory is on. The dynamic
+    /// profile/notes block from MemoryManager follows it.
+    private static let companionMemoryInstructionsSystemPrompt = """
+    memory:
+    you have a long-term memory about the user. it appears below under "what you know about the user" and "recent notes". use it to be personal and specific and recall things naturally when they're relevant, the way a friend would. never read your memory out unprompted, never list what you know, and never mention that you have a memory file, notes, or a profile. if they ask what you remember about something, answer from memory in your own words.
+
+    saving memories: when the user tells you something worth keeping (a fact about them, a project, a tool they use, a preference, or anything they say "remember that…" about), add a tag to your reply: [REMEMBER:Section:fact] where Section is one of About me, Projects, Tools, Preferences, Notes and fact is one short sentence about the user in third person. the tag is removed before your reply is spoken, so also acknowledge it in words. one tag per fact; several tags are fine. don't save things you only see on screen unless the user asked you to remember them, and never save passwords, keys, or other secrets.
+
+    forgetting: when the user asks you to forget something, add [FORGET:text] where text is the fact as closely as you remember it. the app removes the matching line and will add what was forgotten to your reply, so don't describe what you forgot yourself.
+
+    put memory tags right before the point tag, at the end of your reply.
+
+    examples:
+    - user: "remember that my cat is called mochi" → "mochi, great name. noted. [REMEMBER:About me:has a cat called mochi] [POINT:none]"
+    - user: "i've switched from vscode to zed by the way" → "nice, zed's quick. i'll keep that in mind. [REMEMBER:Tools:uses zed as their editor, switched from vscode] [POINT:none]"
+    - user: "remember to ship the demo on friday" → "on it. [REMEMBER:Notes:wants to ship the demo on friday] [POINT:none]"
+    - user: "forget what i said about the cat" → "sure, dropping that. [FORGET:has a cat called mochi] [POINT:none]"
+    - user: "what's my cat called again?" → "mochi, unless there's been a rename. [POINT:none]"
+    """
+
+    /// The base prompt, plus the memory instructions and the current memory
+    /// block when memory is on.
+    private static func makeCompanionSystemPrompt(memoryPromptBlock: String?, isMemoryEnabled: Bool) -> String {
+        guard isMemoryEnabled else { return companionVoiceResponseSystemPrompt }
+        var prompt = companionVoiceResponseSystemPrompt + "\n\n" + companionMemoryInstructionsSystemPrompt
+        if let memoryPromptBlock, !memoryPromptBlock.isEmpty {
+            prompt += "\n\n" + memoryPromptBlock
+        }
+        return prompt
+    }
+
     // MARK: - AI Response Pipeline
 
     /// Captures a screenshot, sends it along with the transcript to the
@@ -605,15 +640,27 @@ final class CompanionManager: ObservableObject {
         currentResponseTask?.cancel()
         textToSpeechClient.stopPlayback()
 
+        // Read before any await: the panel and overlay never activate, so the
+        // frontmost app is the one the user was actually working in.
+        let frontmostApplicationName = NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown app"
+
         currentResponseTask = Task {
             // Stay in processing (spinner) state — no streaming text displayed
             voiceState = .processing
 
             do {
+                // Memory retrieval (an embedding call to Ollama) runs alongside
+                // the screenshot so it adds no latency of its own.
+                let memoryPromptBlockTask = Task { await memoryManager.memoryPromptBlock(forQuestion: transcript) }
+
                 // Capture all connected screens so the AI has full context
                 let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    memoryPromptBlockTask.cancel()
+                    return
+                }
+                let memoryPromptBlock = await memoryPromptBlockTask.value
 
                 // Build image labels with the actual screenshot pixel dimensions
                 // so Claude's coordinate space matches the image it sees. We
@@ -630,7 +677,10 @@ final class CompanionManager: ObservableObject {
 
                 let (fullResponseText, _) = try await chatClient.analyzeImageStreaming(
                     images: labeledImages,
-                    systemPrompt: Self.companionVoiceResponseSystemPrompt,
+                    systemPrompt: Self.makeCompanionSystemPrompt(
+                        memoryPromptBlock: memoryPromptBlock,
+                        isMemoryEnabled: memoryManager.isMemoryEnabled
+                    ),
                     conversationHistory: historyForAPI,
                     userPrompt: transcript,
                     onTextChunk: { _ in
@@ -640,9 +690,18 @@ final class CompanionManager: ObservableObject {
 
                 guard !Task.isCancelled else { return }
 
-                // Parse the [POINT:...] tag from Claude's response
-                let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
-                let spokenText = parseResult.spokenText
+                // Memory tags first (they can be anywhere), then the [POINT:...]
+                // tag, whose parser needs it to be the last thing in the text.
+                let memoryTagParseResult = MemoryTagParser.parse(fullResponseText)
+                let parseResult = Self.parsePointingCoordinates(from: memoryTagParseResult.textWithoutMemoryTags)
+                var spokenText = parseResult.spokenText
+
+                // Write remembered facts / forget lines now; a [FORGET] adds
+                // "forgot: …" to what gets spoken.
+                let memoryWriteOutcome = await memoryManager.applyMemoryTags(memoryTagParseResult, transcript: transcript)
+                if let spokenConfirmation = memoryWriteOutcome.spokenConfirmation {
+                    spokenText = spokenText.isEmpty ? spokenConfirmation : spokenText + " " + spokenConfirmation
+                }
 
                 // Handle element pointing if Claude returned coordinates.
                 // Switch to idle BEFORE setting the location so the triangle
@@ -728,12 +787,22 @@ final class CompanionManager: ObservableObject {
                         speakErrorFallback("i couldn't play that reply out loud. check the text to speech settings.")
                     }
                 }
+
+                // Audio is already playing; the daily-note line is written in
+                // the background and never delays speech.
+                memoryManager.recordExchange(
+                    question: transcript,
+                    spokenReply: spokenText,
+                    frontmostApplicationName: frontmostApplicationName
+                )
             } catch is CancellationError {
                 // User spoke again — response was interrupted
             } catch {
                 ClickyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
                 speakErrorFallback("i couldn't reach the model. check the provider and api key in settings.")
+                // The model never saw it, so keep a spoken "remember that…" anyway.
+                await memoryManager.applyTranscriptFallbackIfNeeded(transcript)
             }
 
             if !Task.isCancelled {

@@ -14,6 +14,7 @@ struct CompanionPanelView: View {
     @ObservedObject var companionManager: CompanionManager
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var kokoroVoiceEngine = KokoroVoiceEngine.shared
+    @ObservedObject private var memoryManager = MemoryManager.shared
     @State private var emailInput: String = ""
     @State private var isAISettingsExpanded: Bool = false
     /// Draft text for each API key field. Keys are written to the Keychain
@@ -643,6 +644,14 @@ struct CompanionPanelView: View {
                     settingsTextFieldRow(title: "Voice ID", text: $appSettings.elevenLabsVoiceID, placeholder: AppSettings.defaultElevenLabsVoiceID)
                 }
 
+                settingsSubsectionLabel("MEMORY")
+                    .padding(.top, 4)
+                settingsToggleRow(title: "Remember things", isOn: $appSettings.isMemoryEnabled)
+                if appSettings.isMemoryEnabled {
+                    memoryStatusRow
+                    memoryActionsRow
+                }
+
                 Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Kokoro to run fully offline.")
                     .font(.system(size: 10))
                     .foregroundColor(DS.Colors.textTertiary)
@@ -813,6 +822,81 @@ struct CompanionPanelView: View {
             .font(.system(size: 10))
             .foregroundColor(DS.Colors.textTertiary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - Memory rows
+
+    private func settingsToggleRow(title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(DS.Colors.textSecondary)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .pointerCursor()
+        }
+    }
+
+    /// Mirrors the Kokoro row: what the two memory models (embeddings +
+    /// summariser, both from Ollama) are doing, with Retry on failure.
+    private var memoryStatusRow: some View {
+        HStack(spacing: 6) {
+            switch memoryManager.provisioningState {
+            case .notChecked:
+                kokoroStatusText("memory models are checked at launch")
+            case .checking:
+                ProgressView()
+                    .controlSize(.mini)
+                kokoroStatusText("checking memory models…")
+            case .pulling(let modelName, let fractionCompleted):
+                ProgressView()
+                    .controlSize(.mini)
+                if let fractionCompleted {
+                    kokoroStatusText("downloading \(modelName)… \(Int(fractionCompleted * 100))% (one time)")
+                } else {
+                    kokoroStatusText("downloading \(modelName)… (one time)")
+                }
+            case .ready:
+                kokoroStatusText("memory ready · \(memoryManager.profileFactLineCount) facts in profile")
+            case .ollamaUnreachable(let message), .failed(let message):
+                kokoroStatusText(message + " — using the last two days of notes meanwhile")
+                Button("Retry") {
+                    memoryManager.retryProvisioning()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(DS.Colors.textSecondary)
+                .pointerCursor()
+            }
+            Spacer()
+        }
+    }
+
+    private var memoryActionsRow: some View {
+        HStack(spacing: 12) {
+            Button("Open memory folder") {
+                NSWorkspace.shared.open(memoryManager.memoryRootDirectoryURL)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(DS.Colors.textSecondary)
+            .pointerCursor()
+
+            Button("Forget today") {
+                Task {
+                    await memoryManager.forgetToday()
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(DS.Colors.textSecondary)
+            .pointerCursor()
+
+            Spacer()
+        }
     }
 
     private func appleVoiceLabel(for voice: AVSpeechSynthesisVoice) -> String {
