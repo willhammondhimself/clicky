@@ -781,12 +781,19 @@ final class CompanionManager: ObservableObject {
                         try await textToSpeechClient.speakText(spokenText)
                         // speakText returns once audio is playing
                         voiceState = .responding
+                    } catch is CancellationError {
+                        // The user spoke again while the voice was loading or
+                        // synthesizing: not a TTS failure, and not an exchange
+                        // worth logging. Let the outer handler end the task.
+                        throw CancellationError()
                     } catch {
                         ClickyAnalytics.trackTTSError(error: error.localizedDescription)
                         print("⚠️ TTS error: \(error)")
                         speakErrorFallback("i couldn't play that reply out loud. check the text to speech settings.")
                     }
                 }
+
+                guard !Task.isCancelled else { return }
 
                 // Audio is already playing; the daily-note line is written in
                 // the background and never delays speech.

@@ -149,6 +149,12 @@ final class MemoryManager: ObservableObject {
         var pastEntries: [DatedDailyNoteEntry] = []
         var mode: MemoryPromptBuilder.Mode = .lastTwoDaysFallback
 
+        // Ollama may have come up since launch (launch-at-login); the
+        // provisioner throttles this to one re-check per interval.
+        if case .ollamaUnreachable = modelProvisioner.provisioningState {
+            await modelProvisioner.prepareIfNeeded()
+        }
+
         if modelProvisioner.isReady {
             do {
                 pastEntries = try await withTimeout(seconds: Self.retrievalTimeoutSeconds) { [self] in
@@ -220,7 +226,7 @@ final class MemoryManager: ObservableObject {
             let summary = await self.summary(question: question, spokenReply: spokenReply, applicationName: frontmostApplicationName)
             let entry = DailyNoteEntry(
                 time: DailyNoteLineFormat.timeString(for: recordedAt, calendar: self.calendar),
-                applicationName: frontmostApplicationName,
+                applicationName: DailyNoteLineFormat.sanitizedApplicationName(frontmostApplicationName),
                 summary: summary
             )
             let dateString = DailyNoteFileNaming.dateString(for: recordedAt, calendar: self.calendar)
@@ -302,15 +308,18 @@ final class MemoryManager: ObservableObject {
     }
 
     /// Embedding similarity when the model is available, case-insensitive
-    /// substring containment otherwise.
+    /// substring containment otherwise. Bounded by the retrieval timeout
+    /// because the caller is in the spoken-reply path.
     private func bestMatchingFactLine(for forgetText: String, among factLines: [String]) async -> String? {
         if modelProvisioner.isReady {
             do {
                 let client = try makeNativeClient()
-                let embeddings = try await client.embed(
-                    texts: [Self.queryEmbeddingPrefix + forgetText] + factLines.map { Self.documentEmbeddingPrefix + $0 },
-                    model: MemoryModelCatalog.embeddingModel
-                )
+                let embeddings = try await withTimeout(seconds: Self.retrievalTimeoutSeconds) {
+                    try await client.embed(
+                        texts: [Self.queryEmbeddingPrefix + forgetText] + factLines.map { Self.documentEmbeddingPrefix + $0 },
+                        model: MemoryModelCatalog.embeddingModel
+                    )
+                }
                 guard embeddings.count == factLines.count + 1 else { return nil }
                 let queryEmbedding = embeddings[0]
                 var bestLine: String?
@@ -327,11 +336,15 @@ final class MemoryManager: ObservableObject {
                 print("⚠️ Memory: embedding for forget failed, using text match: \(error)")
             }
         }
+        // Longest containing match wins so a short line ("ai") can't hijack
+        // "forget the thing about my ai course".
         let loweredForgetText = forgetText.lowercased()
-        return factLines.first { factLine in
-            let loweredFactLine = factLine.lowercased()
-            return loweredFactLine.contains(loweredForgetText) || loweredForgetText.contains(loweredFactLine)
-        }
+        return factLines
+            .filter { factLine in
+                let loweredFactLine = factLine.lowercased()
+                return loweredFactLine.contains(loweredForgetText) || loweredForgetText.contains(loweredFactLine)
+            }
+            .max { $0.count < $1.count }
     }
 
     private func refreshProfileFactLineCount() async {
@@ -428,6 +441,9 @@ final class MemoryManager: ObservableObject {
             }
             document.files[fileName] = IndexedNoteFile(modifiedAtUnixSeconds: fileOnDisk.modifiedAtUnixSeconds, entries: entries)
             print("🧠 Memory: indexed \(fileName) (\(reuse.lineTextsToEmbed.count) new line(s))")
+            // Save per file: a long rebuild that hits the retrieval timeout
+            // then keeps what it managed instead of starting over next time.
+            try await saveIndexDocument(document)
         }
 
         try await saveIndexDocument(document)

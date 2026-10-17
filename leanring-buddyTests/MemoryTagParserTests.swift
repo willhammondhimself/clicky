@@ -58,6 +58,19 @@ struct MemoryTagParserTests {
         #expect(result.rememberedFacts == [RememberedFact(sectionName: "", factText: "likes tea")])
     }
 
+    @Test func aColonInASectionlessFactIsNotTakenAsASection() {
+        let result = MemoryTagParser.parse("[REMEMBER:meeting at 10:30 with alan]")
+        #expect(result.rememberedFacts == [RememberedFact(sectionName: "", factText: "meeting at 10:30 with alan")])
+        let sectioned = MemoryTagParser.parse("[REMEMBER:notes:meeting at 10:30 with alan]")
+        #expect(sectioned.rememberedFacts == [RememberedFact(sectionName: "notes", factText: "meeting at 10:30 with alan")])
+    }
+
+    @Test func newlinesInsideAFactBecomeSpaces() {
+        let result = MemoryTagParser.parse("ok. [REMEMBER:Tools:uses zed\nand vim] [FORGET:the\ncat]")
+        #expect(result.rememberedFacts == [RememberedFact(sectionName: "Tools", factText: "uses zed and vim")])
+        #expect(result.forgetRequests == ["the cat"])
+    }
+
     @Test func unterminatedTagIsCutToTheEndOfTheText() {
         let result = MemoryTagParser.parse("noted. [REMEMBER:Tools:uses zed")
         #expect(result.textWithoutMemoryTags == "noted.")

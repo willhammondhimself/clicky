@@ -22,8 +22,16 @@ nonisolated enum ProfileSection: String, CaseIterable, Sendable {
     var heading: String { "## " + rawValue }
 
     init(matchingHeading headingName: String) {
+        self = ProfileSection.section(exactlyMatchingHeading: headingName) ?? .notes
+    }
+
+    static func isKnownHeadingName(_ headingName: String) -> Bool {
+        section(exactlyMatchingHeading: headingName) != nil
+    }
+
+    private static func section(exactlyMatchingHeading headingName: String) -> ProfileSection? {
         let normalizedHeadingName = headingName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        self = ProfileSection.allCases.first { $0.rawValue.lowercased() == normalizedHeadingName } ?? .notes
+        return ProfileSection.allCases.first { $0.rawValue.lowercased() == normalizedHeadingName }
     }
 }
 

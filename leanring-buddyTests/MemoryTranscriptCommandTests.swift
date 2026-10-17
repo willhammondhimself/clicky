@@ -22,8 +22,18 @@ struct MemoryTranscriptCommandTests {
         #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember to ship the demo on friday") == "to ship the demo on friday")
     }
 
-    @Test func bareRememberYieldsTheRest() {
-        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember my advisor is alan") == "my advisor is alan")
+    @Test func bareRememberWithoutThatThisOrToIsNotACommand() {
+        // Bare "remember …" is usually a question ("remember what I was doing?"),
+        // so only the explicit forms count, as the plan specifies.
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember my advisor is alan") == nil)
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember what I was working on yesterday?") == nil)
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember how to open the color inspector") == nil)
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember me?") == nil)
+    }
+
+    @Test func questionsAreNeverFactsEvenWithThat() {
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember that time I broke the build?") == nil)
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember this one?") == nil)
     }
 
     @Test func allowsAHeyClickyPrefix() {

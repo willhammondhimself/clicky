@@ -38,6 +38,15 @@ struct DailyNoteEntryTests {
         #expect(DailyNoteLineFormat.parse("09:15 · only two parts") == nil)
     }
 
+    @Test func applicationNamesAreMadeSafeForTheLineGrammar() {
+        #expect(DailyNoteLineFormat.sanitizedApplicationName("Xcode") == "Xcode")
+        #expect(DailyNoteLineFormat.sanitizedApplicationName("") == "unknown app")
+        #expect(DailyNoteLineFormat.sanitizedApplicationName("   ") == "unknown app")
+        #expect(DailyNoteLineFormat.sanitizedApplicationName("Odd · Name\nHere") == "Odd - Name Here")
+        let entry = DailyNoteEntry(time: "09:15", applicationName: DailyNoteLineFormat.sanitizedApplicationName("A · B"), summary: "x")
+        #expect(DailyNoteLineFormat.parse(DailyNoteLineFormat.format(entry)) == entry)
+    }
+
     @Test func headerAndTimeStringUseTheInjectedCalendar() {
         #expect(DailyNoteLineFormat.header(forDateString: "2026-10-17") == "# 2026-10-17")
         #expect(DailyNoteLineFormat.timeString(for: fixedDate, calendar: utcCalendar) == "09:15")

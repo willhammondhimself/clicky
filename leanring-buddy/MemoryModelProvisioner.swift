@@ -31,13 +31,21 @@ final class MemoryModelProvisioner: ObservableObject {
     private let pullModel: PullModelOperation
     private var inFlightRunTask: Task<Void, Never>?
     private var runGeneration = 0
+    /// When Ollama was last found unreachable. Unlike a failed pull, that is
+    /// usually transient (launch-at-login before Ollama is up), so it is
+    /// re-checked after `unreachableRetryInterval` instead of staying sticky.
+    private var lastUnreachableDate: Date?
+
+    private let unreachableRetryInterval: TimeInterval
 
     init(
         requiredModels: [String],
+        unreachableRetryInterval: TimeInterval = 30,
         listInstalledModels: @escaping ListInstalledModelsOperation,
         pullModel: @escaping PullModelOperation
     ) {
         self.requiredModels = requiredModels
+        self.unreachableRetryInterval = unreachableRetryInterval
         self.listInstalledModels = listInstalledModels
         self.pullModel = pullModel
     }
@@ -50,8 +58,12 @@ final class MemoryModelProvisioner: ObservableObject {
         }
 
         switch provisioningState {
-        case .ready, .ollamaUnreachable, .failed:
+        case .ready, .failed:
             return
+        case .ollamaUnreachable:
+            if let lastUnreachableDate, Date().timeIntervalSince(lastUnreachableDate) < unreachableRetryInterval {
+                return
+            }
         case .notChecked, .checking, .pulling:
             break
         }
@@ -83,18 +95,7 @@ final class MemoryModelProvisioner: ObservableObject {
     }
 
     private func listAndPullMissingModels() async {
-        let installedModelNames: Set<String>
-        do {
-            installedModelNames = try await listInstalledModels()
-        } catch {
-            provisioningState = .ollamaUnreachable(message: "couldn't reach ollama: \(error.localizedDescription)")
-            print("⚠️ Memory models: Ollama unreachable: \(error)")
-            return
-        }
-
-        let missingModels = requiredModels.filter {
-            !installedModelNames.contains(OllamaNativeEndpoints.normalizedModelName($0))
-        }
+        guard let missingModels = await missingModelsOrNilWhenUnreachable() else { return }
 
         for modelName in missingModels {
             provisioningState = .pulling(modelName: modelName, fractionCompleted: nil)
@@ -110,7 +111,35 @@ final class MemoryModelProvisioner: ObservableObject {
             }
         }
 
+        // A pull stream can end cleanly without installing anything (Ollama
+        // restarted mid-download); only Ollama's own list proves readiness.
+        if !missingModels.isEmpty {
+            guard let stillMissingModels = await missingModelsOrNilWhenUnreachable() else { return }
+            if !stillMissingModels.isEmpty {
+                provisioningState = .failed(message: "download of \(stillMissingModels.joined(separator: ", ")) didn't complete")
+                print("⚠️ Memory models: still missing after pull: \(stillMissingModels)")
+                return
+            }
+        }
+
         provisioningState = .ready
         print("🧠 Memory models ready (\(requiredModels.joined(separator: ", ")))")
+    }
+
+    /// Required models Ollama doesn't have, or nil (state already set) when
+    /// Ollama couldn't be reached.
+    private func missingModelsOrNilWhenUnreachable() async -> [String]? {
+        do {
+            let installedModelNames = try await listInstalledModels()
+            lastUnreachableDate = nil
+            return requiredModels.filter {
+                !installedModelNames.contains(OllamaNativeEndpoints.normalizedModelName($0))
+            }
+        } catch {
+            lastUnreachableDate = Date()
+            provisioningState = .ollamaUnreachable(message: "couldn't reach ollama: \(error.localizedDescription)")
+            print("⚠️ Memory models: Ollama unreachable: \(error)")
+            return nil
+        }
     }
 }

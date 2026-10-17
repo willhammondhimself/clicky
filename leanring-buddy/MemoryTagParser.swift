@@ -56,7 +56,7 @@ nonisolated enum MemoryTagParser {
                     rememberedFacts.insert(rememberedFact, at: 0)
                 }
             } else {
-                let forgetText = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                let forgetText = singleLine(content)
                 if !forgetText.isEmpty {
                     forgetRequests.insert(forgetText, at: 0)
                 }
@@ -72,24 +72,29 @@ nonisolated enum MemoryTagParser {
     }
 
     /// "Tools:uses zed" → (Tools, uses zed); "likes tea" → ("", likes tea).
-    /// Only the first colon separates the section, so facts keep their own
-    /// colons ("meeting at 10:30").
+    /// The text before the first colon is a section only when it names one
+    /// of the known headings, so a sectionless "meeting at 10:30" keeps its
+    /// colon inside the fact.
     private static func rememberedFact(fromTagContent tagContent: String) -> RememberedFact? {
-        let sectionName: String
-        let factText: String
+        var sectionName = ""
+        var factText = tagContent
         if let firstColonIndex = tagContent.firstIndex(of: ":") {
-            sectionName = String(tagContent[..<firstColonIndex])
-            factText = String(tagContent[tagContent.index(after: firstColonIndex)...])
-        } else {
-            sectionName = ""
-            factText = tagContent
+            let candidateSectionName = tagContent[..<firstColonIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+            if ProfileSection.isKnownHeadingName(candidateSectionName) {
+                sectionName = candidateSectionName
+                factText = String(tagContent[tagContent.index(after: firstColonIndex)...])
+            }
         }
-        let trimmedFactText = factText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedFactText.isEmpty else { return nil }
-        return RememberedFact(
-            sectionName: sectionName.trimmingCharacters(in: .whitespacesAndNewlines),
-            factText: trimmedFactText
-        )
+        let cleanedFactText = singleLine(factText)
+        guard !cleanedFactText.isEmpty else { return nil }
+        return RememberedFact(sectionName: sectionName, factText: cleanedFactText)
+    }
+
+    /// Facts are one bullet line each; a newline inside one would leave an
+    /// orphan line in the profile that FORGET could never remove.
+    private static func singleLine(_ text: String) -> String {
+        text.replacingOccurrences(of: #"\s*[\r\n]+\s*"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func collapsingLeftoverSpaces(_ text: String) -> String {

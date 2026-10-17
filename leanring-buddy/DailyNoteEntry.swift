@@ -61,6 +61,17 @@ nonisolated enum DailyNoteLineFormat {
         return DailyNoteEntry(time: time, applicationName: applicationName, summary: summary)
     }
 
+    /// App names come from `NSWorkspace`; make sure one can never break the
+    /// line grammar (separator or newline inside, or empty).
+    static func sanitizedApplicationName(_ applicationName: String) -> String {
+        let cleaned = applicationName
+            .replacingOccurrences(of: "·", with: "-")
+            .replacingOccurrences(of: #"[\r\n]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s{2,}"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "unknown app" : cleaned
+    }
+
     static func header(forDateString dateString: String) -> String {
         "# " + dateString
     }

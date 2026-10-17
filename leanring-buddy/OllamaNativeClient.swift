@@ -61,6 +61,8 @@ final class OllamaNativeClient {
                 throw OllamaNativeEndpoints.ResponseError.serverError(message: message)
             }
         }
+        // EOF without a success line: the server went away mid-download.
+        throw OllamaNativeEndpoints.ResponseError.malformedResponse(description: "pull of \(modelName) ended before it finished")
     }
 
     func embed(texts: [String], model modelName: String) async throws -> [[Float]] {
