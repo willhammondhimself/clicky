@@ -39,13 +39,18 @@ final class MemoryManager: ObservableObject {
 
     var isMemoryEnabled: Bool { appSettings.isMemoryEnabled }
 
-    // Retrieval tuning (see docs/superpowers/specs and the plan).
+    // Retrieval tuning. Thresholds were calibrated against embeddinggemma on
+    // 2026-10-17 with the task prefixes below: a note line that answers the
+    // question scores ≈0.45–0.5, unrelated lines ≤0.2, off-topic questions
+    // ≈0. For FORGET, an exact restatement scores ≈0.85, a paraphrase
+    // ("the cat", "my editor") 0.45–0.6, and a fact that isn't there ≤0.25.
     static let retrievedEntryLimit = 8
-    static let retrievedEntryMinimumSimilarity: Float = 0.5
-    static let forgetMinimumSimilarity: Float = 0.7
+    static let retrievedEntryMinimumSimilarity: Float = 0.3
+    static let forgetMinimumSimilarity: Float = 0.4
     static let retrievalTimeoutSeconds: Double = 5
     /// EmbeddingGemma's recommended task prefixes; queries and documents are
-    /// embedded differently.
+    /// embedded differently. Without them the scores bunch together
+    /// (unrelated lines reach 0.3+), so keep them.
     private static let queryEmbeddingPrefix = "task: search result | query: "
     private static let documentEmbeddingPrefix = "title: none | text: "
 
