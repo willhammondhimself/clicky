@@ -22,9 +22,10 @@ enum OllamaModelWarmer {
     static func preloadAndPin(openAICompatibleBaseURL: String, model: String) {
         let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedModel.isEmpty,
-              let generateURL = nativeGenerateURL(from: openAICompatibleBaseURL) else {
+              let nativeBaseURL = OllamaNativeEndpoints.nativeBaseURL(fromOpenAICompatibleBaseURL: openAICompatibleBaseURL) else {
             return
         }
+        let generateURL = OllamaNativeEndpoints.generateURL(nativeBaseURL: nativeBaseURL)
 
         var request = URLRequest(url: generateURL)
         request.httpMethod = "POST"
@@ -48,16 +49,5 @@ enum OllamaModelWarmer {
                 print("⚠️ Ollama warm-up failed (is Ollama running?): \(error.localizedDescription)")
             }
         }
-    }
-
-    private static func nativeGenerateURL(from openAICompatibleBaseURL: String) -> URL? {
-        var baseString = openAICompatibleBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        while baseString.hasSuffix("/") {
-            baseString.removeLast()
-        }
-        if baseString.hasSuffix("/v1") {
-            baseString.removeLast(3)
-        }
-        return URL(string: baseString + "/api/generate")
     }
 }

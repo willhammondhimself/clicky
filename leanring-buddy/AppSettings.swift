@@ -128,6 +128,7 @@ final class AppSettings: ObservableObject {
         static let appleVoiceIdentifier = "settings.appleVoiceIdentifier"
         static let elevenLabsVoiceID = "settings.elevenLabsVoiceID"
         static let kokoroVoice = "settings.kokoroVoice"
+        static let isMemoryEnabled = "settings.isMemoryEnabled"
     }
 
     /// Voice ID Farza shipped with; kept as the default so ElevenLabs works
@@ -178,6 +179,12 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(kokoroVoice, forKey: Keys.kokoroVoice) }
     }
 
+    /// Whether Clicky keeps a profile + daily notes on disk and injects them
+    /// into the system prompt. See MemoryManager. On by default.
+    @Published var isMemoryEnabled: Bool {
+        didSet { userDefaults.set(isMemoryEnabled, forKey: Keys.isMemoryEnabled) }
+    }
+
     private init() {
         let storedChatProvider = userDefaults.string(forKey: Keys.chatProvider)
             .flatMap(ChatProviderKind.init(rawValue:)) ?? .ollama
@@ -193,6 +200,11 @@ final class AppSettings: ObservableObject {
         appleVoiceIdentifier = userDefaults.string(forKey: Keys.appleVoiceIdentifier) ?? ""
         elevenLabsVoiceID = userDefaults.string(forKey: Keys.elevenLabsVoiceID) ?? Self.defaultElevenLabsVoiceID
         kokoroVoice = userDefaults.string(forKey: Keys.kokoroVoice) ?? KokoroVoiceCatalog.defaultVoice
+        // `bool(forKey:)` returns false for a missing key, so check presence
+        // first to get the "on by default" behaviour.
+        isMemoryEnabled = userDefaults.object(forKey: Keys.isMemoryEnabled) == nil
+            ? true
+            : userDefaults.bool(forKey: Keys.isMemoryEnabled)
 
         // The upstream app stored a bare Claude model name here. It doesn't map
         // onto any of the new providers, so just clear it.
