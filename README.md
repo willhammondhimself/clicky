@@ -12,6 +12,7 @@ Upstream routed every API call through a Cloudflare Worker that held the keys. T
 - **Is provider-agnostic.** The chat model can be any OpenAI-compatible endpoint (OpenRouter, Ollama, LM Studio, vLLM…) or Anthropic directly. One OpenRouter key reaches Haiku 5.5, DeepSeek, GLM, Qwen-VL, Gemini, etc.
 - **Runs fully offline by default.** Fresh install = Apple Speech (STT) → Ollama on localhost (vision LLM) → Kokoro (local neural TTS, one-time ~380 MB model download). Zero accounts needed. AssemblyAI and ElevenLabs are opt-in toggles.
 - **Phones home to nobody.** Upstream's PostHog telemetry, FormSpark email capture and Sparkle update feed are removed.
+- **Remembers you.** A plain-Markdown profile (`PROFILE.md`) plus a daily note per day live in `~/Library/Application Support/Clicky/Memory/` and are fed to the model with every question (past days by embedding search). Say "remember that …" or let the model save facts itself; "forget …" removes them. Two small Ollama models (`embeddinggemma`, `gemma4:e2b`, ~5 GB) download once at launch. Everything you say after "remember that" is stored verbatim, so don't dictate secrets. Toggle it off in AI Settings → Memory.
 
 Everything else — the overlay, pointing animation, screen capture, push-to-talk — is Farza's code.
 
@@ -63,6 +64,9 @@ leanring-buddy/
   SentenceSplitter.swift            # sentence chunking for TTS (unit-tested)
   KokoroVoiceCatalog.swift          # voice codes + labels (unit-tested)
   AppleSpeechTTSClient.swift        # AVSpeechSynthesizer (zero-download fallback)
+  MemoryManager.swift               # profile + daily notes → system prompt; [REMEMBER]/[FORGET] tags
+  MemoryStore.swift                 # file I/O under Application Support/Clicky/Memory
+  MemoryIndex.swift                 # embedding index + cosine search (unit-tested)
   ElevenLabsTTSClient.swift         # ElevenLabs (direct)
   BuddyTranscriptionProvider.swift  # STT protocol + factory (Apple / AssemblyAI / OpenAI)
   CompanionPanelView.swift          # menu bar panel incl. AI Settings

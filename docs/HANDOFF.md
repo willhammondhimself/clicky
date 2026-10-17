@@ -1,15 +1,23 @@
 # HANDOFF — read this first after a context reset
 
-Last updated: 2026-10-15. The Kokoro work (`feature/kokoro-tts`) is merged into `feature/direct-providers` (fast-forward, head `6a00780`) and pushed to `willhammondhimself/clicky`; the local feature branch is deleted. Start the next feature on a new `feature/...` branch off `feature/direct-providers`.
+Last updated: 2026-10-17. Branch `feature/memory` (off `feature/direct-providers`, where Kokoro is merged). Kokoro work: `docs/superpowers/plans/2026-10-14-kokoro-tts.md`; memory work: `docs/superpowers/plans/2026-10-17-memory.md` (decisions + architecture).
 
 ## Where we are
 
 The fork builds and the core loop works end to end, fully offline, on Will's M4 Pro (48 GB):
-hold Ctrl+Option → Apple Speech (on-device) → screenshot → `gemma4:26b` on Ollama → **Kokoro** British male voice (on-device) + cursor flies to the right element.
+hold Ctrl+Option → Apple Speech (on-device) → screenshot → `gemma4:26b` on Ollama → **Kokoro** British male voice (on-device) + cursor flies to the right element. Will verified all of that in the real app on 2026-10-15.
 
-Will verified in the real app on 2026-10-15: cold first run (model downloaded at launch, question asked before it was ready → spinner → Kokoro spoke), warm relaunch, faster first reply after the warm-up change, interrupt mid-sentence, multi-sentence replies with no gaps, no error voice. Not yet tried by Will: switching Kokoro voices, switching back to Apple/ElevenLabs, offline with cached models, Cmd+U in Xcode.
+**Memory (2026-10-17, implemented, not yet run by Will):**
+- `~/Library/Application Support/Clicky/Memory/PROFILE.md` (starter prefilled about Will; `- ` bullets under `## About me / Projects / Tools / Preferences / Notes`) and `notes/YYYY-MM-DD.md` (`HH:MM · App · summary` lines) plus `notes/index.json` (embeddings).
+- Every question: profile whole + today's note whole + top-8 past lines by `embeddinggemma` cosine (≥ 0.5) appended to the system prompt (8,000-char cap). Falls back to profile + yesterday whole when the models aren't ready or Ollama is down (5 s retrieval timeout).
+- Writes: model emits `[REMEMBER:Section:fact]` / `[FORGET:text]` (stripped before TTS; `MemoryTagParser` runs before the POINT parser). "remember that …" at the start of a question is the fallback. FORGET removes the closest profile line (embedding ≥ 0.7, else substring) and Clicky says "forgot: …"; a `forgot:` paper-trail line goes to today's note.
+- After each reply, `gemma4:e2b` summarises the exchange into one note line in the background (raw `question → first sentence` when unavailable), then the new line is embedded.
+- Both models are pulled from Ollama at launch when missing (status row under AI Settings → Memory, Retry on failure). Memory always talks to Ollama even when chat is on a cloud provider (settings URL when provider is Ollama, else `http://127.0.0.1:11434`).
+- Panel: "Remember things" toggle (default on), status row with profile fact count, "Open memory folder", "Forget today".
+- Cold-path reset: delete the `Memory/` folder and `ollama rm embeddinggemma gemma4:e2b`.
+- Three Ollama models are pinned with `keep_alive: -1` (26b chat + e2b + embeddinggemma): fine on 48 GB, tight on 16 GB machines.
 
-Design + plan for the Kokoro work: `docs/superpowers/specs/2026-10-14-kokoro-tts-design.md`, `docs/superpowers/plans/2026-10-14-kokoro-tts.md`.
+What Will should check on first Cmd+R: starter PROFILE.md appears (open folder button); status row goes pulling → ready; "remember that …" lands in the profile; "forget …" speaks "forgot: …"; a question about yesterday's work gets a retrieved note line (console logs `🧠 Memory: N retrieved note entries`); toggle off → no `🧠 Memory block` log line; quit Ollama with a cloud chat provider → status row says unreachable and replies still work.
 
 ### Commits
 
@@ -57,9 +65,9 @@ Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB aft
 - Default actor isolation is MainActor: unannotated types are main-actor. Pure helpers that tests call are `nonisolated enum`s.
 - macOS 26.4–26.5: Kokoro is disabled by `KokoroOperatingSystemSupport` (Apple BNNS crash bug per FluidAudio; fixed in 26.6). Will is on 26.3.
 
-## NEXT FEATURE: memory
+## NEXT FEATURE: wake word
 
-Per the roadmap agreed in the brainstorm: **memory** (profile + daily notes + a "remember this" tool, modelled on HeyClicky's PROFILE.md/VOLATILE.md injected into the system prompt), then wake word (Porcupine or openWakeWord; FluidAudio has VAD and Parakeet STT), then proactive triggers (narrow, opt-in — HeyClicky removed theirs for annoyance/privacy), then background tasks (Cua/Peekaboo). Run the superpowers brainstorming skill (architectural path) first.
+Per the roadmap agreed in the brainstorm: memory (done, above), then **wake word** (Porcupine or openWakeWord; FluidAudio has VAD and Parakeet STT), then proactive triggers (narrow, opt-in — HeyClicky removed theirs for annoyance/privacy), then background tasks (Cua/Peekaboo). Run the superpowers brainstorming skill (architectural path) first; Will likes being grilled with AskUserQuestion.
 
 Also parked: a Jev/OpenJev-style "chooser" model (one-pass option scoring) for accessibility-tree pointing and local/cloud routing; `qwen3-vl` Ollama tag for better pointing; Chatterbox voice cloning and Parakeet STT via the same FluidAudio package.
 
