@@ -1,6 +1,6 @@
 # HANDOFF — read this first after a context reset
 
-Last updated: 2026-10-17. Branch `feature/memory` (off `feature/direct-providers`, where Kokoro is merged). Kokoro work: `docs/superpowers/plans/2026-10-14-kokoro-tts.md`; memory work: `docs/superpowers/plans/2026-10-17-memory.md` (decisions + architecture).
+Last updated: 2026-10-18. Branch `feature/direct-providers` (Kokoro and memory are both merged into it; memory landed via PR #1 on 2026-10-18). Start the next feature on a new `feature/...` branch off it. Kokoro work: `docs/superpowers/plans/2026-10-14-kokoro-tts.md`; memory work: `docs/superpowers/plans/2026-10-17-memory.md` (decisions + architecture).
 
 ## Where we are
 
@@ -56,6 +56,7 @@ Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB aft
 
 - **Never run `xcodebuild` from the terminal** — resets TCC grants. Will builds with Cmd+R. Typecheck with `tools/typecheck.sh` (handles the FluidAudio module once Xcode has built once).
 - **Terminal tests:** `cd tools/logic-tests && swift test`. After adding a new symlink, delete `tools/logic-tests/.build` once (SwiftPM caches the source list).
+- **Timing-sensitive test:** `KokoroTTSClientTests.aCancelledReplyDoesNotMarkTheNextReplyAsFinished` waits fixed 60 ms sleeps for real `AVAudioEngine` playback to finish; it passed twice on 2026-10-17 and failed consistently on 2026-10-18 (same on the base branch, load average ≈5). Not a memory-branch regression. Fix candidate: poll `isPlaying` with a deadline instead of fixed sleeps, as `MemoryModelProvisionerTests.waitUntil` does.
 - **Reading Xcode output without copy-paste:** build logs are `~/Library/Developer/Xcode/DerivedData/leanring-buddy-*/Logs/Build/*.xcactivitylog` (gzip); the console of a *finished* run is in `Logs/Launch/Run-*.xcresult` via `xcrun xcresulttool get log --path <xcresult> --type console`. Xcode's MCP server (`xcrun mcpbridge`) is registered for Claude Code at user scope; Will still needs to enable it in Xcode → Settings → Intelligence, then it can build/test/read issues through Xcode.
 - **Stray instances:** the app registers itself as a login item (`registerAsLoginItemIfNeeded`), and an instance from an earlier Xcode run kept running for hours alongside the new one — both answer the hotkey, so you hear two replies (the old one spoke an "i couldn't reach the model" error). Check `pgrep -fl Clicky.app` when behaviour looks doubled.
 - Xcode project uses **synchronized folders**: new `.swift` files in `leanring-buddy/` are picked up automatically; no pbxproj edits.
