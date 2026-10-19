@@ -2,6 +2,10 @@
 
 Hold a hotkey, ask a question out loud, and a voice assistant that can see your screen answers by voice and points at the button it's talking about. It runs on your Mac, defaults to fully local models, and remembers you between sessions.
 
+![Lumen remembering a fact, answering from a retrieved note and pointing at the code](docs/media/lumen-memory-demo.gif)
+
+*Scripted visualisation of the memory feature using real local model output. [Narrated video](docs/media/lumen-memory-demo.mp4).*
+
 Lumen started as a fork of [farzaa/clicky](https://github.com/farzaa/clicky), the MIT-licensed April 2026 prototype of what became [HeyClicky](https://www.heyclicky.com/), and has since been renamed and redesigned. The original copyright notice stays in `LICENSE`.
 
 ## What's different from upstream
