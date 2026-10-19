@@ -5,7 +5,7 @@
 //  The one object CompanionManager and the panel talk to for memory:
 //
 //    - prepareAtLaunch: create the folder + starter PROFILE.md, make sure the
-//      two Ollama models are installed (pulling them if not).
+//      embedding model is installed in Ollama (pulling it if not).
 //    - memoryPromptBlock(forQuestion:): the profile + relevant note entries
 //      to append to the system prompt (retrieved by embedding similarity, or
 //      the last two days whole when embeddings aren't available).
@@ -222,8 +222,9 @@ final class MemoryManager: ObservableObject {
         await refreshProfileFactLineCount()
     }
 
-    /// Writes one line to today's note (summarised by the small model when
-    /// available, raw otherwise) and indexes it. Fire-and-forget.
+    /// Writes one line to today's note (summarised by the Ollama chat model,
+    /// raw for cloud providers or when that fails) and indexes it.
+    /// Fire-and-forget.
     func recordExchange(question: String, spokenReply: String, frontmostApplicationName: String) {
         guard isMemoryEnabled else { return }
         let recordedAt = Date()
@@ -361,12 +362,19 @@ final class MemoryManager: ObservableObject {
 
     // MARK: - Private: notes and retrieval
 
+    /// Not gated on `modelProvisioner.isReady`: that tracks embeddinggemma,
+    /// which the summary doesn't use. The chat model just answered, so it is
+    /// installed and loaded; if the request fails anyway the raw line is kept.
     private func summary(question: String, spokenReply: String, applicationName: String) async -> String {
-        if modelProvisioner.isReady {
+        let summaryModelName = DailyNoteSummarizer.summaryModelName(
+            isChatProviderOllama: appSettings.chatProviderKind == .ollama,
+            chatModelName: appSettings.chatModel
+        )
+        if let summaryModelName {
             do {
                 let client = try makeNativeClient()
                 let modelOutput = try await client.generate(
-                    model: MemoryModelCatalog.summarizerModel,
+                    model: summaryModelName,
                     systemPrompt: DailyNoteSummarizer.systemPrompt,
                     userPrompt: DailyNoteSummarizer.userPrompt(question: question, spokenReply: spokenReply, applicationName: applicationName)
                 )

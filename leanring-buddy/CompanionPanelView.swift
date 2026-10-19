@@ -762,8 +762,8 @@ struct CompanionPanelView: View {
         }
     }
 
-    /// Mirrors the Kokoro row: what the two memory models (embeddings +
-    /// summariser, both from Ollama) are doing, with Retry on failure.
+    /// Mirrors the Kokoro row: what memory's Ollama model (embeddinggemma;
+    /// summaries use the chat model) is doing, with Retry on failure.
     private var memoryStatusRow: some View {
         HStack(spacing: 6) {
             switch memoryManager.provisioningState {

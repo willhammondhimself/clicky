@@ -30,6 +30,25 @@ struct DailyNoteSummarizerTests {
         #expect(DailyNoteSummarizer.sanitizedSummary(fromModelOutput: "[REMEMBER:a:b]") == nil)
     }
 
+    // The summary is written by the chat model itself when it is a local
+    // Ollama model: Ollama keeps at most 3 models loaded, so a separate
+    // summariser model would evict embeddinggemma before the next reply.
+    @Test func summaryModelIsTheOllamaChatModelTrimmed() {
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: true, chatModelName: "gemma4:26b") == "gemma4:26b")
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: true, chatModelName: "  qwen3.6:35b \n") == "qwen3.6:35b")
+    }
+
+    @Test func noSummaryModelWhenTheOllamaChatModelNameIsBlank() {
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: true, chatModelName: "") == nil)
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: true, chatModelName: "  \n ") == nil)
+    }
+
+    @Test func noSummaryModelForCloudChatProvidersSoNoExtraLocalModelLoads() {
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: false, chatModelName: "claude-haiku-5-5") == nil)
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: false, chatModelName: "gemma4:26b") == nil)
+        #expect(DailyNoteSummarizer.summaryModelName(isChatProviderOllama: false, chatModelName: "") == nil)
+    }
+
     @Test func rawFallbackJoinsTheQuestionAndFirstSentence() {
         #expect(DailyNoteSummarizer.rawFallbackSummary(question: "how do i save", spokenReply: "cmd s, top left. then close.") == "how do i save → cmd s, top left.")
         #expect(DailyNoteSummarizer.rawFallbackSummary(question: "how do i save", spokenReply: "   ") == "how do i save")

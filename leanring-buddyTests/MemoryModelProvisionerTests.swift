@@ -50,7 +50,10 @@ final class FakeOllamaModelSource {
 @MainActor
 struct MemoryModelProvisionerTests {
 
-    private let requiredModels = ["embeddinggemma", "gemma4:e2b"]
+    /// Two models so ordering, partial installs and per-model failures are
+    /// exercised; the provisioner pulls whatever list it is given. Memory
+    /// itself now needs only embeddinggemma (see the catalog test below).
+    private let requiredModels = ["embeddinggemma", "example-model:1b"]
 
     private func makeProvisioner(
         installed: Set<String>,
@@ -78,7 +81,7 @@ struct MemoryModelProvisionerTests {
     }
 
     @Test func unreachableIsCheckedAgainOnceTheRetryIntervalHasPassed() async {
-        let (provisioner, source) = makeProvisioner(installed: ["embeddinggemma:latest", "gemma4:e2b"], unreachableRetryInterval: 0)
+        let (provisioner, source) = makeProvisioner(installed: ["embeddinggemma:latest", "example-model:1b"], unreachableRetryInterval: 0)
         source.listFails = true
         await provisioner.prepareIfNeeded()
         guard case .ollamaUnreachable = provisioner.provisioningState else {
@@ -106,7 +109,7 @@ struct MemoryModelProvisionerTests {
     }
 
     @Test func everythingInstalledMeansReadyWithoutPulling() async {
-        let (provisioner, source) = makeProvisioner(installed: ["embeddinggemma:latest", "gemma4:e2b", "gemma4:26b"])
+        let (provisioner, source) = makeProvisioner(installed: ["embeddinggemma:latest", "example-model:1b", "gemma4:26b"])
         await provisioner.prepareIfNeeded()
         #expect(provisioner.provisioningState == .ready)
         #expect(provisioner.isReady)
@@ -123,19 +126,19 @@ struct MemoryModelProvisionerTests {
 
         let prepareTask = Task { await provisioner.prepareIfNeeded() }
         await waitUntil { source.pulledModelNames.count == 1 }
-        #expect(provisioner.provisioningState == .pulling(modelName: "gemma4:e2b", fractionCompleted: 0.25))
+        #expect(provisioner.provisioningState == .pulling(modelName: "example-model:1b", fractionCompleted: 0.25))
         #expect(!provisioner.isReady)
 
         gate.open()
         await prepareTask.value
-        #expect(source.pulledModelNames == ["gemma4:e2b"])
+        #expect(source.pulledModelNames == ["example-model:1b"])
         #expect(provisioner.provisioningState == .ready)
     }
 
     @Test func missingModelsArePulledSequentiallyInRequiredOrder() async {
         let (provisioner, source) = makeProvisioner(installed: [])
         await provisioner.prepareIfNeeded()
-        #expect(source.pulledModelNames == ["embeddinggemma", "gemma4:e2b"])
+        #expect(source.pulledModelNames == ["embeddinggemma", "example-model:1b"])
         #expect(provisioner.provisioningState == .ready)
     }
 
@@ -153,7 +156,7 @@ struct MemoryModelProvisionerTests {
 
     @Test func pullFailureMeansFailedAndRetryTriesAgain() async {
         let (provisioner, source) = makeProvisioner(installed: ["embeddinggemma:latest"])
-        source.failingPullModelName = "gemma4:e2b"
+        source.failingPullModelName = "example-model:1b"
         await provisioner.prepareIfNeeded()
         guard case .failed = provisioner.provisioningState else {
             Issue.record("expected failed, got \(provisioner.provisioningState)")
@@ -162,7 +165,7 @@ struct MemoryModelProvisionerTests {
 
         source.failingPullModelName = nil
         await provisioner.retry()
-        #expect(source.pulledModelNames == ["gemma4:e2b", "gemma4:e2b"])
+        #expect(source.pulledModelNames == ["example-model:1b", "example-model:1b"])
         #expect(provisioner.provisioningState == .ready)
     }
 
@@ -182,6 +185,14 @@ struct MemoryModelProvisionerTests {
         #expect(!MemoryModelCatalog.requiredModels.contains(PointingGroundingRequest.modelName))
     }
 
+    @Test func memoryRequiresOnlyTheEmbeddingModel() {
+        // Daily-note summaries are written by the Ollama chat model (or raw
+        // for cloud providers), so the old gemma4:e2b summariser is no longer
+        // pulled: a fourth model made Ollama evict embeddinggemma every reply.
+        #expect(MemoryModelCatalog.requiredModels == ["embeddinggemma"])
+        #expect(!MemoryModelCatalog.requiredModels.contains("gemma4:e2b"))
+    }
+
     @Test func concurrentCallersShareOneRun() async {
         let (provisioner, source) = makeProvisioner(installed: [])
         let gate = LoadGate()
@@ -196,7 +207,7 @@ struct MemoryModelProvisionerTests {
 
         // One run: the initial list plus the post-pull verification, not one per caller.
         #expect(source.listCallCount == 2)
-        #expect(source.pulledModelNames == ["embeddinggemma", "gemma4:e2b"])
+        #expect(source.pulledModelNames == ["embeddinggemma", "example-model:1b"])
         #expect(provisioner.provisioningState == .ready)
     }
 }

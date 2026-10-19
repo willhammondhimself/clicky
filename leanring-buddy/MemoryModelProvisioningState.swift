@@ -2,9 +2,10 @@
 //  MemoryModelProvisioningState.swift
 //  leanring-buddy
 //
-//  Whether the two Ollama models memory needs (embeddinggemma for retrieval,
-//  gemma4:e2b for daily-note summaries) are installed. Published by
-//  MemoryModelProvisioner and shown in the AI Settings memory status row.
+//  Whether the Ollama model memory needs (embeddinggemma for retrieval) is
+//  installed. Published by MemoryModelProvisioner and shown in the AI
+//  Settings memory status row. Daily-note summaries use the chat model, so
+//  they need nothing pulled here (see DailyNoteSummarizer.summaryModelName).
 //
 
 import Foundation
@@ -22,8 +23,10 @@ nonisolated enum MemoryModelProvisioningState: Equatable, Sendable {
 
 nonisolated enum MemoryModelCatalog {
     static let embeddingModel = "embeddinggemma"
-    static let summarizerModel = "gemma4:e2b"
-    /// Pulled in this order on first launch: the small one first so retrieval
-    /// starts working while the summariser is still downloading.
-    static let requiredModels = [embeddingModel, summarizerModel]
+    /// Only the embedding model. The old gemma4:e2b summariser was dropped:
+    /// with the chat model and precise pointing's model it made four, Ollama
+    /// keeps at most three loaded, and the evictions added ~0.8 s before
+    /// every reply. Existing installs keep gemma4:e2b on disk; Lumen just
+    /// stops using it.
+    static let requiredModels = [embeddingModel]
 }

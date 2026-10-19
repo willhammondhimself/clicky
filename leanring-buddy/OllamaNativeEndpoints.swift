@@ -94,6 +94,9 @@ nonisolated enum OllamaNativeEndpoints {
     /// Non-streaming, thinking disabled, low temperature, short output: the
     /// shape used for the daily-note summariser. `includesThinkFlag` is false
     /// on the retry after a model rejects the `think` key with HTTP 400.
+    /// No `num_ctx`: the summariser is the already-loaded chat model, and a
+    /// context that differs from the one it was loaded with makes Ollama
+    /// reload it.
     static func generateRequestBody(
         modelName: String,
         systemPrompt: String,

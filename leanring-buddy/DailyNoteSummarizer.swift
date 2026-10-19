@@ -2,9 +2,10 @@
 //  DailyNoteSummarizer.swift
 //  leanring-buddy
 //
-//  Prompts and output cleaning for the one-line daily-note summary that a
-//  small Ollama model (gemma4:e2b) writes after each exchange, plus the raw
-//  fallback the app writes itself when that model is unavailable.
+//  Prompts and output cleaning for the one-line daily-note summary that the
+//  Ollama chat model (the one that just answered, already loaded) writes
+//  after each exchange, which model that is, plus the raw fallback the app
+//  writes itself for cloud chat providers or when the model fails.
 //
 
 import Foundation
@@ -51,8 +52,22 @@ nonisolated enum DailyNoteSummarizer {
         return summary
     }
 
+    /// The Ollama model that writes the summary: the chat model itself when
+    /// the chat provider is Ollama, so no extra model has to be loaded (Ollama
+    /// keeps at most 3 resident and a fourth evicted embeddinggemma, adding
+    /// ~0.8 s before every reply). Nil for cloud providers, and for a blank
+    /// model name, meaning "write `rawFallbackSummary` instead": Lumen must not
+    /// load a local model just for summaries. Takes a Bool rather than
+    /// `ChatProviderKind` because that enum lives in AppSettings.swift, which
+    /// the terminal test harness can't compile.
+    static func summaryModelName(isChatProviderOllama: Bool, chatModelName: String) -> String? {
+        guard isChatProviderOllama else { return nil }
+        let trimmedChatModelName = chatModelName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedChatModelName.isEmpty ? nil : trimmedChatModelName
+    }
+
     /// `question → first sentence of the reply`, or just the question when the
-    /// reply is empty. Used when the summariser model is unavailable.
+    /// reply is empty. Used when there is no summary model or it fails.
     static func rawFallbackSummary(question: String, spokenReply: String) -> String {
         let cleanedQuestion = separatorFree(question).trimmingCharacters(in: .whitespacesAndNewlines)
         let firstSentence = firstSentence(of: spokenReply)
