@@ -51,11 +51,11 @@ struct SkinPanelBackground: View {
         if #available(macOS 26.0, *) {
             cardShape
                 .fill(backgroundColor.opacity(0.35))
-                .glassEffect(.regular.tint(backgroundColor.opacity(0.7)), in: cardShape)
+                .glassEffect(.regular.tint(backgroundColor.opacity(theme.glassTintOpacity)), in: cardShape)
         } else {
             ZStack {
                 cardShape.fill(.ultraThinMaterial)
-                cardShape.fill(backgroundColor.opacity(0.85))
+                cardShape.fill(backgroundColor.opacity(theme.glassTintOpacity))
             }
         }
     }
