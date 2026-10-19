@@ -50,7 +50,7 @@ nonisolated enum ProfileMarkdownEditor {
         - builds his own tools; wants a local-first, always-on JARVIS-style assistant (this app)
 
         ## Projects
-        - Lumen: this macOS screen-aware voice assistant, forked from farzaa/clicky, Swift/SwiftUI
+        - Lumen: this macOS assistant (Swift/SwiftUI), meant as the final layer of his stack: sees what he's doing, gives contextual hints, runs locally in the background on very little inference
         - Market Population Dynamics: agent-based market simulation research (paused), advisor Alan Kahn
         - Haven: iOS care companion app for an elderly user and a caretaker
         - Lucid: lucid-dream training iOS app using Apple Watch / Oura sleep data

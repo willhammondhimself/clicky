@@ -39,7 +39,7 @@ Three new source files plus pure helpers, all in `leanring-buddy/`, following th
 
 Main-actor singleton (`KokoroVoiceEngine.shared`) because the factory rebuilds TTS clients on every settings change and the Kokoro models must load once, not per client.
 
-- Owns one `KokoroAneManager`, created lazily with `variant: .english`, `directory: ~/Library/Application Support/Clicky/Models`, and `version: .v3` when `#available(macOS 15, *)`, else `.legacy`.
+- Owns one `KokoroAneManager`, created lazily with `variant: .english`, `directory: ~/Library/Application Support/Lumen/Models`, and `version: .v3` when `#available(macOS 15, *)`, else `.legacy`.
 - `@Published private(set) var loadState: LoadState` with cases `notLoaded`, `loading`, `ready`, `failed(message: String)`, `unavailable(reason: String)`.
 - `func prepareIfNeeded(preloadingVoice voice: String) async` — idempotent. If a load is already in flight it awaits that task. Sets `loading`, calls `initialize(preloadVoices: [voice])` off the main actor, then `ready` or `failed`. Also called fire-and-forget by the factory (see wiring).
 - `func synthesizeSentence(_ sentence: String, voice: String) async throws -> AVAudioPCMBuffer` — calls `synthesizeDetailed`, copies `samples` into a 24 kHz mono Float32 buffer. Throws `KokoroVoiceEngineError.modelNotReady` if `loadState` is not `ready`.
@@ -141,7 +141,7 @@ Unit tests (existing `leanring-buddyTests` target, run by Will in Xcode):
 - `KokoroVoiceEngine.operatingSystemBlocksKokoro` for 26.3, 26.4, 26.5, 26.6, 27.0.
 
 Manual checklist (Cmd+R, never `xcodebuild`):
-1. Fresh state (delete `~/Library/Application Support/Clicky/Models`): select Kokoro, ask a question immediately → spinner, then Kokoro speech; status row went downloading → ready.
+1. Fresh state (delete `~/Library/Application Support/Lumen/Models`): select Kokoro, ask a question immediately → spinner, then Kokoro speech; status row went downloading → ready.
 2. Quit and relaunch → first reply within ~0.5 s of the model finishing (warm load).
 3. Change voice to `bm_fable` → next reply uses it; status row briefly shows downloading for the new pack.
 4. Ask a multi-sentence question → no audible gaps between sentences.

@@ -23,7 +23,7 @@
 - Package pin: `https://github.com/FluidInference/FluidAudio` at **exactly 0.17.7**, product `FluidAudio`, linked to the app target only.
 - Deployment target stays `14.2`. The v3 runtime is selected at runtime with `#available(macOS 15, *)`.
 - Default Kokoro voice: `bm_george`. Fresh-install TTS default: `.kokoro`. Stored settings are always respected.
-- Model directory: `~/Library/Application Support/Clicky/Models`.
+- Model directory: `~/Library/Application Support/Lumen/Models`.
 - macOS 26.4 and 26.5: Kokoro is disabled (`unavailable`) and the Apple voice is used.
 - Copy for the user-facing strings is lowercase-casual like the rest of the panel where noted; status strings are given verbatim in the tasks.
 
@@ -42,8 +42,8 @@
 | Path | Responsibility |
 |---|---|
 | `tools/logic-tests/Package.swift` (create) | Terminal test harness: SwiftPM package whose sources and tests are symlinks into the app and test folders. |
-| `tools/logic-tests/Sources/ClickyLogic/*.swift` (symlinks) | `SentenceSplitter.swift`, `KokoroVoiceCatalog.swift`, `KokoroOperatingSystemSupport.swift`, `SentenceAudioQueuePlayer.swift`. |
-| `tools/logic-tests/Tests/ClickyLogicTests/*.swift` (symlinks) | The matching test files from `leanring-buddyTests/`. |
+| `tools/logic-tests/Sources/LumenLogic/*.swift` (symlinks) | `SentenceSplitter.swift`, `KokoroVoiceCatalog.swift`, `KokoroOperatingSystemSupport.swift`, `SentenceAudioQueuePlayer.swift`. |
+| `tools/logic-tests/Tests/LumenLogicTests/*.swift` (symlinks) | The matching test files from `leanring-buddyTests/`. |
 | `leanring-buddy/SentenceSplitter.swift` (create) | Pure: reply text → sentence chunks sized for the Kokoro fast path. |
 | `leanring-buddy/KokoroVoiceCatalog.swift` (create) | Pure: the 28 American/British voice codes, labels, ordering, default. |
 | `leanring-buddy/KokoroOperatingSystemSupport.swift` (create) | Pure: which macOS builds block Kokoro; whether the v3 runtime is available. |
@@ -64,18 +64,18 @@
 
 **Files:**
 - Create: `tools/logic-tests/Package.swift`
-- Create: `tools/logic-tests/Sources/ClickyLogic/.gitkeep` (placeholder removed in Task 2)
-- Create: `tools/logic-tests/Tests/ClickyLogicTests/HarnessSmokeTests.swift`
+- Create: `tools/logic-tests/Sources/LumenLogic/.gitkeep` (placeholder removed in Task 2)
+- Create: `tools/logic-tests/Tests/LumenLogicTests/HarnessSmokeTests.swift`
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Produces: a package named `ClickyLogic` whose target settings mirror the app (`.swiftLanguageMode(.v5)`, `.defaultIsolation(MainActor.self)`). Later tasks drop symlinks into `Sources/ClickyLogic/` and `Tests/ClickyLogicTests/`.
+- Produces: a package named `LumenLogic` whose target settings mirror the app (`.swiftLanguageMode(.v5)`, `.defaultIsolation(MainActor.self)`). Later tasks drop symlinks into `Sources/LumenLogic/` and `Tests/LumenLogicTests/`.
 - Test files in `leanring-buddyTests/` import the module conditionally so the same file compiles in Xcode and in the harness:
   ```swift
   #if canImport(leanring_buddy)
   @testable import leanring_buddy
   #else
-  @testable import ClickyLogic
+  @testable import LumenLogic
   #endif
   ```
 
@@ -84,7 +84,7 @@
 ```swift
 // swift-tools-version: 6.2
 //
-// Terminal test harness for Clicky's pure-logic files. The app itself can
+// Terminal test harness for Lumen's pure-logic files. The app itself can
 // only be built from Xcode (running xcodebuild from the terminal resets the
 // app's TCC permissions), so files with no AppKit/FluidAudio dependency are
 // symlinked into this package and tested with `swift test`.
@@ -100,16 +100,16 @@ let mirroredAppTargetSettings: [SwiftSetting] = [
 ]
 
 let package = Package(
-    name: "ClickyLogic",
+    name: "LumenLogic",
     platforms: [.macOS(.v14)],
     targets: [
         .target(
-            name: "ClickyLogic",
+            name: "LumenLogic",
             swiftSettings: mirroredAppTargetSettings
         ),
         .testTarget(
-            name: "ClickyLogicTests",
-            dependencies: ["ClickyLogic"],
+            name: "LumenLogicTests",
+            dependencies: ["LumenLogic"],
             swiftSettings: mirroredAppTargetSettings
         ),
     ]
@@ -120,14 +120,14 @@ Save as `tools/logic-tests/Package.swift`.
 
 - [ ] **Step 2: Add a placeholder source and a smoke test**
 
-`tools/logic-tests/Sources/ClickyLogic/HarnessPlaceholder.swift`:
+`tools/logic-tests/Sources/LumenLogic/HarnessPlaceholder.swift`:
 ```swift
 // Removed once the first real file is symlinked in (Task 2). SwiftPM needs
 // at least one source file to build the target.
 nonisolated enum HarnessPlaceholder {}
 ```
 
-`tools/logic-tests/Tests/ClickyLogicTests/HarnessSmokeTests.swift`:
+`tools/logic-tests/Tests/LumenLogicTests/HarnessSmokeTests.swift`:
 ```swift
 import Testing
 
@@ -165,8 +165,8 @@ git commit -m "build: add terminal test harness for pure-logic files"
 **Files:**
 - Create: `leanring-buddy/SentenceSplitter.swift`
 - Create: `leanring-buddyTests/SentenceSplitterTests.swift`
-- Create symlinks: `tools/logic-tests/Sources/ClickyLogic/SentenceSplitter.swift` → `../../../../leanring-buddy/SentenceSplitter.swift`; `tools/logic-tests/Tests/ClickyLogicTests/SentenceSplitterTests.swift` → `../../../../leanring-buddyTests/SentenceSplitterTests.swift`
-- Delete: `tools/logic-tests/Sources/ClickyLogic/HarnessPlaceholder.swift`
+- Create symlinks: `tools/logic-tests/Sources/LumenLogic/SentenceSplitter.swift` → `../../../../leanring-buddy/SentenceSplitter.swift`; `tools/logic-tests/Tests/LumenLogicTests/SentenceSplitterTests.swift` → `../../../../leanring-buddyTests/SentenceSplitterTests.swift`
+- Delete: `tools/logic-tests/Sources/LumenLogic/HarnessPlaceholder.swift`
 
 **Interfaces:**
 - Produces: `nonisolated enum SentenceSplitter { static func split(_ text: String) -> [String] }`, constants `minimumChunkCharacterCount = 20`, `maximumChunkCharacterCount = 300`.
@@ -180,7 +180,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct SentenceSplitterTests {
@@ -265,9 +265,9 @@ struct SentenceSplitterTests {
 
 ```bash
 cd ~/code/clicky/tools/logic-tests
-rm Sources/ClickyLogic/HarnessPlaceholder.swift
-ln -s ../../../../leanring-buddy/SentenceSplitter.swift Sources/ClickyLogic/SentenceSplitter.swift
-ln -s ../../../../leanring-buddyTests/SentenceSplitterTests.swift Tests/ClickyLogicTests/SentenceSplitterTests.swift
+rm Sources/LumenLogic/HarnessPlaceholder.swift
+ln -s ../../../../leanring-buddy/SentenceSplitter.swift Sources/LumenLogic/SentenceSplitter.swift
+ln -s ../../../../leanring-buddyTests/SentenceSplitterTests.swift Tests/LumenLogicTests/SentenceSplitterTests.swift
 swift test 2>&1 | tail -5
 ```
 Expected: build error, "cannot find 'SentenceSplitter' in scope" (the source symlink dangles until Step 3).
@@ -475,7 +475,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct KokoroVoiceCatalogTests {
@@ -518,8 +518,8 @@ struct KokoroVoiceCatalogTests {
 
 ```bash
 cd ~/code/clicky/tools/logic-tests
-ln -s ../../../../leanring-buddy/KokoroVoiceCatalog.swift Sources/ClickyLogic/KokoroVoiceCatalog.swift
-ln -s ../../../../leanring-buddyTests/KokoroVoiceCatalogTests.swift Tests/ClickyLogicTests/KokoroVoiceCatalogTests.swift
+ln -s ../../../../leanring-buddy/KokoroVoiceCatalog.swift Sources/LumenLogic/KokoroVoiceCatalog.swift
+ln -s ../../../../leanring-buddyTests/KokoroVoiceCatalogTests.swift Tests/LumenLogicTests/KokoroVoiceCatalogTests.swift
 swift test 2>&1 | tail -3
 ```
 Expected: build error "cannot find 'KokoroVoiceCatalog' in scope".
@@ -532,7 +532,7 @@ Expected: build error "cannot find 'KokoroVoiceCatalog' in scope".
 //  KokoroVoiceCatalog.swift
 //  leanring-buddy
 //
-//  The Kokoro voices Clicky offers in the voice picker, with readable
+//  The Kokoro voices Lumen offers in the voice picker, with readable
 //  labels. Voice codes follow Kokoro's convention: first letter is the
 //  accent (a = American, b = British), second is the gender (f/m), then the
 //  name. The list is the English subset of FluidAudio's
@@ -648,7 +648,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct KokoroOperatingSystemSupportTests {
@@ -686,8 +686,8 @@ struct KokoroOperatingSystemSupportTests {
 
 ```bash
 cd ~/code/clicky/tools/logic-tests
-ln -s ../../../../leanring-buddy/KokoroOperatingSystemSupport.swift Sources/ClickyLogic/KokoroOperatingSystemSupport.swift
-ln -s ../../../../leanring-buddyTests/KokoroOperatingSystemSupportTests.swift Tests/ClickyLogicTests/KokoroOperatingSystemSupportTests.swift
+ln -s ../../../../leanring-buddy/KokoroOperatingSystemSupport.swift Sources/LumenLogic/KokoroOperatingSystemSupport.swift
+ln -s ../../../../leanring-buddyTests/KokoroOperatingSystemSupportTests.swift Tests/LumenLogicTests/KokoroOperatingSystemSupportTests.swift
 swift test 2>&1 | tail -3
 ```
 Expected: build error "cannot find 'KokoroOperatingSystemSupport' in scope".
@@ -703,7 +703,7 @@ Expected: build error "cannot find 'KokoroOperatingSystemSupport' in scope".
 //  Which macOS builds can run Kokoro safely. FluidAudio's own notes
 //  (KokoroAneManager.osAdvisory) record an Apple BNNS bug on macOS 26.4 and
 //  26.5 that crashes synthesis in-process with EXC_BAD_ACCESS — not something
-//  a catch block can handle — and that 26.6 fixes it. On those builds Clicky
+//  a catch block can handle — and that 26.6 fixes it. On those builds Lumen
 //  refuses to load Kokoro and speaks with the Apple voice instead.
 //
 
@@ -1010,7 +1010,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct SentenceAudioQueuePlayerTests {
@@ -1079,8 +1079,8 @@ struct SentenceAudioQueuePlayerTests {
 
 ```bash
 cd ~/code/clicky/tools/logic-tests
-ln -s ../../../../leanring-buddy/SentenceAudioQueuePlayer.swift Sources/ClickyLogic/SentenceAudioQueuePlayer.swift
-ln -s ../../../../leanring-buddyTests/SentenceAudioQueuePlayerTests.swift Tests/ClickyLogicTests/SentenceAudioQueuePlayerTests.swift
+ln -s ../../../../leanring-buddy/SentenceAudioQueuePlayer.swift Sources/LumenLogic/SentenceAudioQueuePlayer.swift
+ln -s ../../../../leanring-buddyTests/SentenceAudioQueuePlayerTests.swift Tests/LumenLogicTests/SentenceAudioQueuePlayerTests.swift
 swift test 2>&1 | tail -3
 ```
 Expected: build error "cannot find 'SentenceAudioQueuePlayer' in scope".
@@ -1268,7 +1268,7 @@ final class KokoroVoiceEngine: ObservableObject {
     /// Everything Kokoro downloads lives here so it is easy to find and delete.
     static let modelsDirectory: URL = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Clicky/Models", isDirectory: true)
+        .appendingPathComponent("Lumen/Models", isDirectory: true)
 
     @Published private(set) var loadState: LoadState
 
@@ -1643,7 +1643,7 @@ Tell Will: "Cmd+R. In the menu bar panel → AI Settings → Text to speech, pic
 
 **Files:** none. Will executes in the running app; the executor records results in the final report.
 
-- [ ] **Step 1: Cold first run** — quit the app, `rm -rf ~/Library/Application\ Support/Clicky/Models`, Cmd+R, select Kokoro, ask a question immediately. Expected: spinner stays until the model is ready, then Kokoro speech; status row went downloading → ready.
+- [ ] **Step 1: Cold first run** — quit the app, `rm -rf ~/Library/Application\ Support/Lumen/Models`, Cmd+R, select Kokoro, ask a question immediately. Expected: spinner stays until the model is ready, then Kokoro speech; status row went downloading → ready.
 - [ ] **Step 2: Warm relaunch** — quit, Cmd+R, ask. Expected: Kokoro speech within about half a second of the model's text finishing.
 - [ ] **Step 3: Voice switch** — pick `Fable (British, male)`; ask again. Expected: new voice; status row briefly showed downloading for the new pack.
 - [ ] **Step 4: Multi-sentence reply** — ask something that yields 3+ sentences ("explain what each button on this toolbar does"). Expected: no audible gaps.
@@ -1666,7 +1666,7 @@ Tell Will: "Cmd+R. In the menu bar panel → AI Settings → Text to speech, pic
 
 - Architecture TTS line → `- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`.`
 - Add Key Files rows (approximate line counts from the real files):
-  - `KokoroVoiceEngine.swift` — singleton owning the FluidAudio `KokoroAneManager`; load state (`notLoaded/loading/ready/failed/unavailable`), model dir `~/Library/Application Support/Clicky/Models`, sentence → PCM buffer.
+  - `KokoroVoiceEngine.swift` — singleton owning the FluidAudio `KokoroAneManager`; load state (`notLoaded/loading/ready/failed/unavailable`), model dir `~/Library/Application Support/Lumen/Models`, sentence → PCM buffer.
   - `KokoroTTSClient.swift` — `TTSClient` for Kokoro: sentence split → synthesize → gapless queue; Apple-voice fallback when the model can't load.
   - `SentenceAudioQueuePlayer.swift` — `AVAudioEngine`/`AVAudioPlayerNode` queue with generation-guarded `isPlaying`.
   - `SentenceSplitter.swift` — pure sentence chunker (20/300 char rules).
