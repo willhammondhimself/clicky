@@ -166,6 +166,22 @@ struct MemoryModelProvisionerTests {
         #expect(provisioner.provisioningState == .ready)
     }
 
+    @Test func aSecondInstanceForPointingPullsOnlyTheGroundingModel() async {
+        // Precise pointing reuses the provisioner with its own model list; the
+        // memory models must never be pulled on its behalf (and vice versa).
+        let source = FakeOllamaModelSource(installedModelNames: ["gemma4:26b"])
+        let pointingModelProvisioner = MemoryModelProvisioner(
+            requiredModels: PointingGroundingRequest.requiredModels,
+            logLabel: "Pointing model",
+            listInstalledModels: { try await source.listInstalledModels() },
+            pullModel: { modelName, onProgress in try await source.pullModel(modelName, onProgress: onProgress) }
+        )
+        await pointingModelProvisioner.prepareIfNeeded()
+        #expect(source.pulledModelNames == ["qwen3-vl:4b-instruct"])
+        #expect(pointingModelProvisioner.provisioningState == .ready)
+        #expect(!MemoryModelCatalog.requiredModels.contains(PointingGroundingRequest.modelName))
+    }
+
     @Test func concurrentCallersShareOneRun() async {
         let (provisioner, source) = makeProvisioner(installed: [])
         let gate = LoadGate()

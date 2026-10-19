@@ -2,8 +2,9 @@
 //  MemoryModelProvisioner.swift
 //  leanring-buddy
 //
-//  Checks which of the memory models Ollama has and pulls the missing ones,
-//  one at a time, publishing progress for the status row. Mirrors
+//  Checks which of the required models Ollama has and pulls the missing
+//  ones, one at a time, publishing progress for the status row. Memory and
+//  precise pointing each own an instance with their own model list. Mirrors
 //  KokoroModelLoadCoordinator: a single in-flight run that every caller
 //  awaits, sticky failure until `retry()`. Free of networking (the two
 //  operations are injected) so it is unit-tested with fakes.
@@ -27,6 +28,8 @@ final class MemoryModelProvisioner: ObservableObject {
     }
 
     private let requiredModels: [String]
+    /// Names this instance in the log ("Memory models", "Pointing model").
+    private let logLabel: String
     private let listInstalledModels: ListInstalledModelsOperation
     private let pullModel: PullModelOperation
     private var inFlightRunTask: Task<Void, Never>?
@@ -41,11 +44,13 @@ final class MemoryModelProvisioner: ObservableObject {
     init(
         requiredModels: [String],
         unreachableRetryInterval: TimeInterval = 30,
+        logLabel: String = "Memory models",
         listInstalledModels: @escaping ListInstalledModelsOperation,
         pullModel: @escaping PullModelOperation
     ) {
         self.requiredModels = requiredModels
         self.unreachableRetryInterval = unreachableRetryInterval
+        self.logLabel = logLabel
         self.listInstalledModels = listInstalledModels
         self.pullModel = pullModel
     }
@@ -99,14 +104,14 @@ final class MemoryModelProvisioner: ObservableObject {
 
         for modelName in missingModels {
             provisioningState = .pulling(modelName: modelName, fractionCompleted: nil)
-            print("⬇️ Memory models: pulling \(modelName)")
+            print("⬇️ \(logLabel): pulling \(modelName)")
             do {
                 try await pullModel(modelName) { [weak self] fractionCompleted in
                     self?.provisioningState = .pulling(modelName: modelName, fractionCompleted: fractionCompleted)
                 }
             } catch {
                 provisioningState = .failed(message: "couldn't download \(modelName): \(error.localizedDescription)")
-                print("⚠️ Memory models: pull of \(modelName) failed: \(error)")
+                print("⚠️ \(logLabel): pull of \(modelName) failed: \(error)")
                 return
             }
         }
@@ -117,13 +122,13 @@ final class MemoryModelProvisioner: ObservableObject {
             guard let stillMissingModels = await missingModelsOrNilWhenUnreachable() else { return }
             if !stillMissingModels.isEmpty {
                 provisioningState = .failed(message: "download of \(stillMissingModels.joined(separator: ", ")) didn't complete")
-                print("⚠️ Memory models: still missing after pull: \(stillMissingModels)")
+                print("⚠️ \(logLabel): still missing after pull: \(stillMissingModels)")
                 return
             }
         }
 
         provisioningState = .ready
-        print("🧠 Memory models ready (\(requiredModels.joined(separator: ", ")))")
+        print("🧠 \(logLabel) ready (\(requiredModels.joined(separator: ", ")))")
     }
 
     /// Required models Ollama doesn't have, or nil (state already set) when
@@ -138,7 +143,7 @@ final class MemoryModelProvisioner: ObservableObject {
         } catch {
             lastUnreachableDate = Date()
             provisioningState = .ollamaUnreachable(message: "couldn't reach ollama: \(error.localizedDescription)")
-            print("⚠️ Memory models: Ollama unreachable: \(error)")
+            print("⚠️ \(logLabel): Ollama unreachable: \(error)")
             return nil
         }
     }
