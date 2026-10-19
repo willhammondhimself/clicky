@@ -69,7 +69,7 @@ enum ChatClientFactory {
             // them where they mean something.
             var extraHeaders: [String: String] = [:]
             if providerKind == .openRouter {
-                extraHeaders["HTTP-Referer"] = "https://github.com/willhammondhimself/clicky"
+                extraHeaders["HTTP-Referer"] = "https://github.com/willhammondhimself/lumen"
                 extraHeaders["X-Title"] = "Lumen"
             }
             return OpenAICompatibleChatClient(

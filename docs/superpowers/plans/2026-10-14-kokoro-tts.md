@@ -14,7 +14,7 @@
 
 - **Never run `xcodebuild` from the terminal.** It invalidates TCC permissions. Will builds with Cmd+R and runs the Xcode test target with Cmd+U. Terminal verification is `swift test` inside `tools/logic-tests/` plus the `swiftc -typecheck` command below.
 - Typecheck of app sources (works until a file imports FluidAudio):
-  `cd ~/code/clicky && xcrun swiftc -typecheck -sdk "$(xcrun --show-sdk-path --sdk macosx)" -target arm64-apple-macos14.2 -parse-as-library -default-isolation MainActor leanring-buddy/*.swift`
+  `cd ~/code/lumen && xcrun swiftc -typecheck -sdk "$(xcrun --show-sdk-path --sdk macosx)" -target arm64-apple-macos14.2 -parse-as-library -default-isolation MainActor leanring-buddy/*.swift`
   Expected: zero errors. One pre-existing warning "no async operations occur within await" in `OpenAICompatibleChatClient.swift` is known and ignored.
 - Every unannotated type is main-actor isolated. Pure helpers that tests or non-main code call are declared `nonisolated enum`.
 - Naming: clarity over concision, no single-letter names, no abbreviations in parameter names (repo `AGENTS.md`).
@@ -140,7 +140,7 @@ struct HarnessSmokeTests {
 
 - [ ] **Step 3: Run the harness**
 
-Run: `cd ~/code/clicky/tools/logic-tests && swift test 2>&1 | tail -3`
+Run: `cd ~/code/lumen/tools/logic-tests && swift test 2>&1 | tail -3`
 Expected: `✔ Test run with 1 test in 1 suite passed`.
 
 - [ ] **Step 4: Ignore the build directory**
@@ -153,7 +153,7 @@ tools/logic-tests/.build/
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add tools/logic-tests .gitignore
 git commit -m "build: add terminal test harness for pure-logic files"
 ```
@@ -264,7 +264,7 @@ struct SentenceSplitterTests {
 - [ ] **Step 2: Wire the symlinks and run the tests to verify they fail**
 
 ```bash
-cd ~/code/clicky/tools/logic-tests
+cd ~/code/lumen/tools/logic-tests
 rm Sources/LumenLogic/HarnessPlaceholder.swift
 ln -s ../../../../leanring-buddy/SentenceSplitter.swift Sources/LumenLogic/SentenceSplitter.swift
 ln -s ../../../../leanring-buddyTests/SentenceSplitterTests.swift Tests/LumenLogicTests/SentenceSplitterTests.swift
@@ -429,7 +429,7 @@ nonisolated enum SentenceSplitter {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd ~/code/clicky/tools/logic-tests && swift test 2>&1 | tail -4`
+Run: `cd ~/code/lumen/tools/logic-tests && swift test 2>&1 | tail -4`
 Expected: `✔ Test run with 13 tests in 2 suites passed` (12 splitter tests + the smoke test).
 
 - [ ] **Step 5: Typecheck the app sources**
@@ -440,7 +440,7 @@ Expected: zero errors.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/SentenceSplitter.swift leanring-buddyTests/SentenceSplitterTests.swift tools/logic-tests
 git commit -m "feat: add sentence splitter for chunked text-to-speech"
 ```
@@ -517,7 +517,7 @@ struct KokoroVoiceCatalogTests {
 - [ ] **Step 2: Add the symlinks and run to verify failure**
 
 ```bash
-cd ~/code/clicky/tools/logic-tests
+cd ~/code/lumen/tools/logic-tests
 ln -s ../../../../leanring-buddy/KokoroVoiceCatalog.swift Sources/LumenLogic/KokoroVoiceCatalog.swift
 ln -s ../../../../leanring-buddyTests/KokoroVoiceCatalogTests.swift Tests/LumenLogicTests/KokoroVoiceCatalogTests.swift
 swift test 2>&1 | tail -3
@@ -607,7 +607,7 @@ nonisolated enum KokoroVoiceCatalog {
 
 - [ ] **Step 4: Run the tests**
 
-Run: `cd ~/code/clicky/tools/logic-tests && swift test 2>&1 | tail -3`
+Run: `cd ~/code/lumen/tools/logic-tests && swift test 2>&1 | tail -3`
 Expected: all pass (18 tests in 3 suites).
 
 - [ ] **Step 5: Typecheck app sources, then commit**
@@ -615,7 +615,7 @@ Expected: all pass (18 tests in 3 suites).
 Run the typecheck command. Expected: zero errors.
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/KokoroVoiceCatalog.swift leanring-buddyTests/KokoroVoiceCatalogTests.swift tools/logic-tests
 git commit -m "feat: add Kokoro voice catalog with readable labels"
 ```
@@ -685,7 +685,7 @@ struct KokoroOperatingSystemSupportTests {
 - [ ] **Step 2: Symlink and run to verify failure**
 
 ```bash
-cd ~/code/clicky/tools/logic-tests
+cd ~/code/lumen/tools/logic-tests
 ln -s ../../../../leanring-buddy/KokoroOperatingSystemSupport.swift Sources/LumenLogic/KokoroOperatingSystemSupport.swift
 ln -s ../../../../leanring-buddyTests/KokoroOperatingSystemSupportTests.swift Tests/LumenLogicTests/KokoroOperatingSystemSupportTests.swift
 swift test 2>&1 | tail -3
@@ -732,11 +732,11 @@ nonisolated enum KokoroOperatingSystemSupport {
 
 - [ ] **Step 4: Run the tests, typecheck, commit**
 
-Run: `cd ~/code/clicky/tools/logic-tests && swift test 2>&1 | tail -3` → all pass (22 tests in 4 suites).
+Run: `cd ~/code/lumen/tools/logic-tests && swift test 2>&1 | tail -3` → all pass (22 tests in 4 suites).
 Run the typecheck command → zero errors.
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/KokoroOperatingSystemSupport.swift leanring-buddyTests/KokoroOperatingSystemSupportTests.swift tools/logic-tests
 git commit -m "feat: add macOS build guard for Kokoro synthesis"
 ```
@@ -876,7 +876,7 @@ Run the typecheck command. Expected: zero errors. (If the panel switch complains
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/AppSettings.swift leanring-buddy/TTSClient.swift leanring-buddy/CompanionManager.swift leanring-buddy/CompanionPanelView.swift
 git commit -m "feat: add Kokoro text-to-speech setting and voice picker"
 ```
@@ -956,7 +956,7 @@ Insert after `/* End XCConfigurationList section */` and before the `	};` that c
 
 - [ ] **Step 6: Sanity-check the plist syntax**
 
-Run: `plutil -lint ~/code/clicky/leanring-buddy.xcodeproj/project.pbxproj`
+Run: `plutil -lint ~/code/lumen/leanring-buddy.xcodeproj/project.pbxproj`
 Expected: `project.pbxproj: OK`.
 
 - [ ] **Step 7: CHECKPOINT — ask Will to build**
@@ -966,7 +966,7 @@ Tell Will: "Open the project in Xcode and press Cmd+R. Xcode will resolve and do
 - [ ] **Step 8: Commit the project change and the resolved file**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy.xcodeproj/project.pbxproj leanring-buddy.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 git commit -m "build: add FluidAudio 0.17.7 package dependency"
 ```
@@ -1078,7 +1078,7 @@ struct SentenceAudioQueuePlayerTests {
 - [ ] **Step 2: Symlink and run to verify failure**
 
 ```bash
-cd ~/code/clicky/tools/logic-tests
+cd ~/code/lumen/tools/logic-tests
 ln -s ../../../../leanring-buddy/SentenceAudioQueuePlayer.swift Sources/LumenLogic/SentenceAudioQueuePlayer.swift
 ln -s ../../../../leanring-buddyTests/SentenceAudioQueuePlayerTests.swift Tests/LumenLogicTests/SentenceAudioQueuePlayerTests.swift
 swift test 2>&1 | tail -3
@@ -1181,7 +1181,7 @@ final class SentenceAudioQueuePlayer {
 
 - [ ] **Step 4: Run the tests**
 
-Run: `cd ~/code/clicky/tools/logic-tests && swift test 2>&1 | tail -3`
+Run: `cd ~/code/lumen/tools/logic-tests && swift test 2>&1 | tail -3`
 Expected: all pass (26 tests in 5 suites). The two playback tests play about a second of silence through the default output device.
 
 - [ ] **Step 5: Typecheck app sources, then commit**
@@ -1189,7 +1189,7 @@ Expected: all pass (26 tests in 5 suites). The two playback tests play about a s
 Run the typecheck command (this file has no FluidAudio import, so the plain command still works). Expected: zero errors.
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/SentenceAudioQueuePlayer.swift leanring-buddyTests/SentenceAudioQueuePlayerTests.swift tools/logic-tests
 git commit -m "feat: add gapless sentence audio queue player"
 ```
@@ -1366,14 +1366,14 @@ final class KokoroVoiceEngine: ObservableObject {
 
 Run (with `$FLUIDAUDIO_MODULE_DIR` from Task 6 Step 9):
 ```bash
-cd ~/code/clicky && xcrun swiftc -typecheck -sdk "$(xcrun --show-sdk-path --sdk macosx)" -target arm64-apple-macos14.2 -parse-as-library -default-isolation MainActor -I "$FLUIDAUDIO_MODULE_DIR" leanring-buddy/*.swift
+cd ~/code/lumen && xcrun swiftc -typecheck -sdk "$(xcrun --show-sdk-path --sdk macosx)" -target arm64-apple-macos14.2 -parse-as-library -default-isolation MainActor -I "$FLUIDAUDIO_MODULE_DIR" leanring-buddy/*.swift
 ```
 Expected: zero errors. If the module cannot be found or NemoTextProcessing is missing, skip to Step 3 and rely on Will's build in Task 10.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/KokoroVoiceEngine.swift
 git commit -m "feat: add Kokoro voice engine wrapping the FluidAudio model manager"
 ```
@@ -1550,7 +1550,7 @@ Run the typecheck command with `-I "$FLUIDAUDIO_MODULE_DIR"` (Task 8 Step 2). Ex
 - [ ] **Step 4: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/KokoroTTSClient.swift leanring-buddy/TTSClient.swift
 git commit -m "feat: speak replies with the local Kokoro voice"
 ```
@@ -1628,7 +1628,7 @@ Run the typecheck command with `-I "$FLUIDAUDIO_MODULE_DIR"`. Expected: zero err
 - [ ] **Step 4: Commit**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add leanring-buddy/CompanionPanelView.swift
 git commit -m "feat: show Kokoro model download status with retry in AI Settings"
 ```
@@ -1692,7 +1692,7 @@ In the spec, change "All 54 English voices selectable" and "lists all 54 English
 - [ ] **Step 5: Commit and push**
 
 ```bash
-cd ~/code/clicky
+cd ~/code/lumen
 git add AGENTS.md README.md docs/HANDOFF.md docs/superpowers/specs/2026-10-14-kokoro-tts-design.md
 git commit -m "docs: document the Kokoro text-to-speech provider"
 git push
