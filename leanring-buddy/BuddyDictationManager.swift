@@ -279,12 +279,26 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     /// Timestamp of the last completed permission request, used to debounce
     /// rapid follow-up requests that arrive before macOS updates its cache.
     private var lastPermissionRequestCompletedAt: Date?
+    private var audioEngineConfigurationChangeObserver: NSObjectProtocol?
 
     override init() {
         let transcriptionProvider = BuddyTranscriptionProviderFactory.makeDefaultProvider()
         self.transcriptionProvider = transcriptionProvider
         self.transcriptionProviderDisplayName = transcriptionProvider.displayName
         super.init()
+
+        // A route change (AirPods connecting, switching to their headset
+        // mode, a USB mic unplugged) stops the engine without an error.
+        // Restart capture so the push-to-talk in progress isn't lost.
+        audioEngineConfigurationChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: audioEngine,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.restartMicrophoneCaptureAfterConfigurationChange()
+            }
+        }
     }
 
     func updateContextualKeyterms(_ contextualKeyterms: [String]) {
@@ -555,6 +569,17 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         self.activeTranscriptionSession = activeTranscriptionSession
         print("🎙️ BuddyDictationManager: provider ready, starting audio engine")
 
+        try startMicrophoneCapture()
+    }
+
+    /// Points the engine at the chosen microphone, taps it into the active
+    /// transcription session and starts the engine.
+    private func startMicrophoneCapture() throws {
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        selectMicrophoneForRecording()
+
         let inputNode = audioEngine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
@@ -566,6 +591,40 @@ final class BuddyDictationManager: NSObject, ObservableObject {
 
         audioEngine.prepare()
         try audioEngine.start()
+    }
+
+    /// The MacBook mic by default (see MicrophoneSelection), else macOS's
+    /// default input. Set on every recording so a settings change or a
+    /// device plugged in since the last one is picked up.
+    private func selectMicrophoneForRecording() {
+        let chosenDeviceIdentifier = MicrophoneSelection.inputDeviceIdentifier(
+            preference: AppSettings.shared.microphonePreference,
+            availableInputDevices: AudioInputDeviceCatalog.availableInputDevices()
+        ) ?? AudioInputDeviceCatalog.systemDefaultInputDeviceIdentifier()
+
+        guard var deviceIdentifier = chosenDeviceIdentifier,
+              let inputAudioUnit = audioEngine.inputNode.audioUnit else { return }
+        let status = AudioUnitSetProperty(
+            inputAudioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceIdentifier,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        print("🎙️ Microphone: \(AudioInputDeviceCatalog.deviceName(deviceIdentifier))\(status == noErr ? "" : " (couldn't select it: \(status))")")
+    }
+
+    private func restartMicrophoneCaptureAfterConfigurationChange() {
+        guard activeTranscriptionSession != nil,
+              !hasFinishedCurrentDictationSession,
+              !audioEngine.isRunning else { return }
+        print("🎙️ Audio route changed mid-recording; restarting the microphone")
+        do {
+            try startMicrophoneCapture()
+        } catch {
+            print("❌ Couldn't restart the microphone after a route change: \(error)")
+        }
     }
 
     private func handleRecognitionError(_ error: Error) {

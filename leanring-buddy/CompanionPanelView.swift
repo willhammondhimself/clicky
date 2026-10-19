@@ -536,6 +536,7 @@ struct CompanionPanelView: View {
 
                 settingsSubsectionLabel("VOICE")
                     .padding(.top, 4)
+                settingsPickerRow(title: "Microphone", selection: $appSettings.microphonePreference)
                 settingsPickerRow(title: "Speech to text", selection: $appSettings.speechToTextProviderKind)
                 if let speechToTextSecretKey = appSettings.speechToTextProviderKind.secretKey {
                     apiKeyRow(for: speechToTextSecretKey)
@@ -646,6 +647,7 @@ struct CompanionPanelView: View {
         if let textToSpeechProviderKind = kind as? TextToSpeechProviderKind { return textToSpeechProviderKind.displayName }
         if let lumenSkin = kind as? LumenSkin { return lumenSkin.displayName }
         if let replyDisplayMode = kind as? ReplyDisplayMode { return replyDisplayMode.displayName }
+        if let microphonePreference = kind as? MicrophonePreference { return microphonePreference.displayName }
         return "\(kind)"
     }
 

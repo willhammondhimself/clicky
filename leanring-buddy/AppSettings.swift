@@ -131,6 +131,7 @@ final class AppSettings: ObservableObject {
         static let selectedSkin = "settings.selectedSkin"
         static let isMemoryEnabled = "settings.isMemoryEnabled"
         static let replyDisplayMode = "settings.replyDisplayMode"
+        static let microphonePreference = "settings.microphonePreference"
     }
 
     /// Upstream's default ElevenLabs voice ID, kept so ElevenLabs works
@@ -200,6 +201,12 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(replyDisplayMode.rawValue, forKey: Keys.replyDisplayMode) }
     }
 
+    /// Which mic push-to-talk records from: the MacBook's own by default,
+    /// so AirPods stay in their high-quality mode. Read at each recording.
+    @Published var microphonePreference: MicrophonePreference {
+        didSet { userDefaults.set(microphonePreference.rawValue, forKey: Keys.microphonePreference) }
+    }
+
     private init() {
         let storedChatProvider = userDefaults.string(forKey: Keys.chatProvider)
             .flatMap(ChatProviderKind.init(rawValue:)) ?? .ollama
@@ -225,6 +232,8 @@ final class AppSettings: ObservableObject {
             .flatMap(LumenSkin.init(rawValue:)) ?? .defaultSkin
         replyDisplayMode = userDefaults.string(forKey: Keys.replyDisplayMode)
             .flatMap(ReplyDisplayMode.init(rawValue:)) ?? .defaultMode
+        microphonePreference = userDefaults.string(forKey: Keys.microphonePreference)
+            .flatMap(MicrophonePreference.init(rawValue:)) ?? .defaultPreference
 
         // The upstream app stored a bare Claude model name here. It doesn't map
         // onto any of the new providers, so just clear it.
