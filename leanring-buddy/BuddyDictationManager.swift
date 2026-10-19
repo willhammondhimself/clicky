@@ -263,7 +263,10 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     }
 
     private var transcriptionProvider: any BuddyTranscriptionProvider
-    private let audioEngine = AVAudioEngine()
+    /// Replaced at the start of every recording: an engine keeps the input
+    /// format it first read, so one reused after a mic change (AirPods ⇄
+    /// MacBook mic) asks for the wrong sample rate and the tap is refused.
+    private var audioEngine = AVAudioEngine()
     private var activeTranscriptionSession: (any BuddyStreamingTranscriptionSession)?
     private var activeStartSource: BuddyDictationStartSource?
     private var draftCallbacks: BuddyDictationDraftCallbacks?
@@ -280,19 +283,28 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     /// rapid follow-up requests that arrive before macOS updates its cache.
     private var lastPermissionRequestCompletedAt: Date?
     private var audioEngineConfigurationChangeObserver: NSObjectProtocol?
+    /// Route changes can come in bursts (AirPods flipping modes); stop
+    /// restarting after a few so a flapping device can't loop forever.
+    private var microphoneRestartCountThisSession = 0
+    private static let maximumMicrophoneRestartsPerSession = 3
 
     override init() {
         let transcriptionProvider = BuddyTranscriptionProviderFactory.makeDefaultProvider()
         self.transcriptionProvider = transcriptionProvider
         self.transcriptionProviderDisplayName = transcriptionProvider.displayName
         super.init()
+    }
 
-        // A route change (AirPods connecting, switching to their headset
-        // mode, a USB mic unplugged) stops the engine without an error.
-        // Restart capture so the push-to-talk in progress isn't lost.
+    /// A route change (AirPods connecting, switching to their headset mode,
+    /// a USB mic unplugged) stops the engine without an error. Restart
+    /// capture so the push-to-talk in progress isn't lost.
+    private func observeConfigurationChanges(of observedAudioEngine: AVAudioEngine) {
+        if let audioEngineConfigurationChangeObserver {
+            NotificationCenter.default.removeObserver(audioEngineConfigurationChangeObserver)
+        }
         audioEngineConfigurationChangeObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
-            object: audioEngine,
+            object: observedAudioEngine,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -575,13 +587,24 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     /// Points the engine at the chosen microphone, taps it into the active
     /// transcription session and starts the engine.
     private func startMicrophoneCapture() throws {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine = AVAudioEngine()
+        observeConfigurationChanges(of: audioEngine)
+        // Choose the mic before anything reads the input node's format.
         selectMicrophoneForRecording()
 
         let inputNode = audioEngine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
+        let microphoneFormat = inputNode.inputFormat(forBus: 0)
+        // installTap raises an Objective-C exception (which ends the app) when
+        // these differ; report it as an ordinary error instead.
+        guard inputFormat.sampleRate == microphoneFormat.sampleRate, inputFormat.channelCount > 0 else {
+            throw MicrophoneCaptureError.formatMismatch(
+                tapSampleRate: inputFormat.sampleRate,
+                microphoneSampleRate: microphoneFormat.sampleRate
+            )
+        }
 
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
@@ -615,10 +638,23 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         print("🎙️ Microphone: \(AudioInputDeviceCatalog.deviceName(deviceIdentifier))\(status == noErr ? "" : " (couldn't select it: \(status))")")
     }
 
+    enum MicrophoneCaptureError: LocalizedError {
+        case formatMismatch(tapSampleRate: Double, microphoneSampleRate: Double)
+
+        var errorDescription: String? {
+            switch self {
+            case .formatMismatch(let tapSampleRate, let microphoneSampleRate):
+                return "the microphone changed format (\(Int(tapSampleRate)) vs \(Int(microphoneSampleRate)) Hz). try again."
+            }
+        }
+    }
+
     private func restartMicrophoneCaptureAfterConfigurationChange() {
         guard activeTranscriptionSession != nil,
               !hasFinishedCurrentDictationSession,
-              !audioEngine.isRunning else { return }
+              !audioEngine.isRunning,
+              microphoneRestartCountThisSession < Self.maximumMicrophoneRestartsPerSession else { return }
+        microphoneRestartCountThisSession += 1
         print("🎙️ Audio route changed mid-recording; restarting the microphone")
         do {
             try startMicrophoneCapture()
@@ -696,6 +732,7 @@ final class BuddyDictationManager: NSObject, ObservableObject {
 
     private func resetSessionState() {
         pendingStartRequestIdentifier = UUID()
+        microphoneRestartCountThisSession = 0
         activeTranscriptionSession = nil
         draftCallbacks = nil
         activeStartSource = nil
