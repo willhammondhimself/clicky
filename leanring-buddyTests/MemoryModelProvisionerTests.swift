@@ -193,6 +193,22 @@ struct MemoryModelProvisionerTests {
         #expect(!MemoryModelCatalog.requiredModels.contains("gemma4:e2b"))
     }
 
+    @Test func theRetiredSummariserIsUnloadedWhenNothingStillUsesIt() {
+        // Earlier builds pinned gemma4:e2b with keep_alive -1, so on existing
+        // installs it stays loaded until something unloads it, and with all
+        // runners pinned Ollama evicts embeddinggemma instead of it.
+        #expect(MemoryModelCatalog.retiredModels == ["gemma4:e2b"])
+        #expect(MemoryModelCatalog.retiredModelsToUnload(modelsStillInUse: ["gemma4:26b", "qwen3-vl:4b-instruct"]) == ["gemma4:e2b"])
+        #expect(MemoryModelCatalog.retiredModelsToUnload(modelsStillInUse: []) == ["gemma4:e2b"])
+    }
+
+    @Test func aRetiredModelTheUserChoseAsChatModelIsLeftLoaded() {
+        // Someone who picked gemma4:e2b as their chat model must not have it
+        // unloaded under them at launch.
+        #expect(MemoryModelCatalog.retiredModelsToUnload(modelsStillInUse: ["gemma4:e2b"]).isEmpty)
+        #expect(MemoryModelCatalog.retiredModelsToUnload(modelsStillInUse: ["  gemma4:e2b \n"]).isEmpty)
+    }
+
     @Test func concurrentCallersShareOneRun() async {
         let (provisioner, source) = makeProvisioner(installed: [])
         let gate = LoadGate()

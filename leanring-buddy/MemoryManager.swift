@@ -59,6 +59,7 @@ final class MemoryManager: ObservableObject {
     private var modelProvisioner: MemoryModelProvisioner!
     private var indexDocument: MemoryIndexDocument?
     private var cancellables: Set<AnyCancellable> = []
+    private var hasStartedRetiredModelUnload = false
 
     private var calendar: Calendar { Calendar.current }
 
@@ -101,7 +102,39 @@ final class MemoryManager: ObservableObject {
     /// Creates the memory folder and starter profile, then checks/pulls the
     /// Ollama models in the background. Safe to call again.
     func prepareAtLaunch() {
+        unloadRetiredModelsOnce()
         prepareIfEnabled(isMemoryEnabled: isMemoryEnabled)
+    }
+
+    /// Earlier builds pinned the gemma4:e2b summariser with keep_alive -1,
+    /// so on existing installs it stays loaded after the upgrade. With every
+    /// runner pinned, Ollama evicts by model name rather than last use, so
+    /// it would keep evicting embeddinggemma and the pointing model (~0.8 s
+    /// reload before replies) until Ollama restarts. Unloading it once per
+    /// launch ends that; it stays on disk. Runs whether memory is on or not,
+    /// since a pinned leftover crowds out the chat model's neighbours either
+    /// way. Fire-and-forget: a failure only leaves things as they were.
+    private func unloadRetiredModelsOnce() {
+        guard !hasStartedRetiredModelUnload else { return }
+        hasStartedRetiredModelUnload = true
+        let retiredModelNamesToUnload = MemoryModelCatalog.retiredModelsToUnload(
+            modelsStillInUse: [appSettings.chatModel, PointingGroundingRequest.modelName]
+        )
+        guard !retiredModelNamesToUnload.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            for retiredModelName in retiredModelNamesToUnload {
+                do {
+                    try await self.makeNativeClient().unloadModel(named: retiredModelName)
+                    print("🧹 Memory: unloaded retired model \(retiredModelName) (still on disk)")
+                } catch let statusError as OllamaNativeClient.HTTPStatusError where statusError.statusCode == 404 {
+                    // Not installed (never pulled, or removed by hand): nothing to unload.
+                    continue
+                } catch {
+                    print("⚠️ Memory: couldn't unload retired model \(retiredModelName): \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     private func prepareIfEnabled(isMemoryEnabled: Bool) {

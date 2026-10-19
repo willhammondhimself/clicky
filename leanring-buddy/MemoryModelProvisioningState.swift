@@ -29,4 +29,21 @@ nonisolated enum MemoryModelCatalog {
     /// every reply. Existing installs keep gemma4:e2b on disk; Lumen just
     /// stops using it.
     static let requiredModels = [embeddingModel]
+
+    /// Models earlier builds pinned with keep_alive -1 and this build no
+    /// longer uses. Ollama keeps a pinned model loaded until it restarts, and
+    /// when every runner is pinned it picks what to evict by name rather than
+    /// by last use, so a leftover gemma4:e2b keeps pushing embeddinggemma out.
+    /// MemoryManager unloads these (not deletes them) once per launch.
+    static let retiredModels = ["gemma4:e2b"]
+
+    /// The retired models to unload at launch: all of them except any the
+    /// user still uses (e.g. picked gemma4:e2b as their chat model), which
+    /// must stay loaded.
+    static func retiredModelsToUnload(modelsStillInUse: [String]) -> [String] {
+        let normalizedModelsStillInUse = Set(modelsStillInUse.map(OllamaNativeEndpoints.normalizedModelName))
+        return retiredModels.filter {
+            !normalizedModelsStillInUse.contains(OllamaNativeEndpoints.normalizedModelName($0))
+        }
+    }
 }

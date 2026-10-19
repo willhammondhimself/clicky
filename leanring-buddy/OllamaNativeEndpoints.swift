@@ -157,6 +157,14 @@ nonisolated enum OllamaNativeEndpoints {
         ])
     }
 
+    /// Unloads a model from memory without deleting it from disk: /api/generate
+    /// with no prompt and keep_alive 0. Ollama answers `done_reason: unload`
+    /// at once, and for a model that isn't loaded it does nothing (it does
+    /// not load it first; checked on 0.34.4). A missing model is HTTP 404.
+    static func unloadRequestBody(modelName: String) -> Data {
+        encodeBody(["model": modelName, "keep_alive": 0, "stream": false])
+    }
+
     // MARK: - Pull stream
 
     /// One newline-delimited JSON line of the /api/pull stream. Nil for blank

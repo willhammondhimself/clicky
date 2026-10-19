@@ -172,6 +172,16 @@ struct OllamaNativeEndpointsTests {
         #expect(loadOptions["num_ctx"] as? Int == requestOptions["num_ctx"] as? Int)
     }
 
+    @Test func unloadRequestOnlyExpiresTheModel() throws {
+        // /api/generate with no prompt and keep_alive 0 unloads a loaded
+        // model and is a no-op for an idle one; a prompt would load it first.
+        let unloadBody = try jsonObject(from: OllamaNativeEndpoints.unloadRequestBody(modelName: "gemma4:e2b"))
+        #expect(unloadBody["model"] as? String == "gemma4:e2b")
+        #expect(unloadBody["keep_alive"] as? Int == 0)
+        #expect(unloadBody["prompt"] == nil)
+        #expect(unloadBody["stream"] as? Bool == false)
+    }
+
     @Test func parsesChatMessageContent() throws {
         let response = Data("""
         {"model":"qwen3-vl:4b-instruct","created_at":"2026-10-19T12:00:00Z","message":{"role":"assistant","content":"[POINT:512,87]"},"done":true}

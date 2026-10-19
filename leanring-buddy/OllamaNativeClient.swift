@@ -116,6 +116,17 @@ final class OllamaNativeClient {
         _ = try await perform(request)
     }
 
+    /// Unloads a model from Ollama's memory (it stays on disk). Throws
+    /// `HTTPStatusError` 404 when the model isn't installed.
+    func unloadModel(named modelName: String) async throws {
+        var request = URLRequest(url: OllamaNativeEndpoints.generateURL(nativeBaseURL: nativeBaseURL))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = OllamaNativeEndpoints.unloadRequestBody(modelName: modelName)
+        _ = try await perform(request)
+    }
+
     // MARK: - Private
 
     private func generateOnce(model modelName: String, systemPrompt: String, userPrompt: String, includesThinkFlag: Bool) async throws -> String {
