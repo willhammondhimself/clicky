@@ -45,6 +45,14 @@ struct PointingGroundingRequestTests {
         #expect(PointingGroundingRequest.gridPoint(fromModelReply: "The save button is at [POINT:120,940].") == CGPoint(x: 120, y: 940))
     }
 
+    @Test func parsesTheSquareBracketPairQwenActuallyReplies() {
+        // Live replies from qwen3-vl:4b-instruct to Lumen's exact request
+        // (2026-10-19): no "POINT:" prefix, a space after the comma.
+        #expect(PointingGroundingRequest.gridPoint(fromModelReply: "[890, 840]") == CGPoint(x: 890, y: 840))
+        #expect(PointingGroundingRequest.gridPoint(fromModelReply: "[418, 17]\n") == CGPoint(x: 418, y: 17))
+        #expect(PointingGroundingRequest.gridPoint(fromModelReply: "[903,725]") == CGPoint(x: 903, y: 725))
+    }
+
     @Test func parsesABarePairAndDecimals() {
         #expect(PointingGroundingRequest.gridPoint(fromModelReply: "512,87") == CGPoint(x: 512, y: 87))
         #expect(PointingGroundingRequest.gridPoint(fromModelReply: " (512, 87) ") == CGPoint(x: 512, y: 87))

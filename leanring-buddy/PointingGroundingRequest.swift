@@ -43,16 +43,17 @@ nonisolated enum PointingGroundingRequest {
     static let gridOvershootTolerance: CGFloat = 50
 
     /// The grid point in "[POINT:x,y]" (anywhere in the reply, an optional
-    /// ":label" after it is ignored) or a reply that is only "x,y" (optionally
-    /// in parentheses). Decimals are accepted. Nil for anything else or for a
-    /// point too far off the grid.
+    /// ":label" after it is ignored) or a reply that is only "x,y", optionally
+    /// in parentheses or square brackets: qwen3-vl actually answers "[890, 840]"
+    /// despite being asked for "[POINT:x,y]". Decimals are accepted. Nil for
+    /// anything else or for a point too far off the grid.
     static func gridPoint(fromModelReply modelReply: String) -> CGPoint? {
         let trimmedReply = modelReply.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedReply.isEmpty else { return nil }
 
         let numberPattern = #"(-?\d+(?:\.\d+)?)"#
         let pointTagPattern = #"\[POINT:\s*"# + numberPattern + #"\s*,\s*"# + numberPattern + #"\s*(?::[^\]]*)?\]"#
-        let barePairPattern = #"^\(?\s*"# + numberPattern + #"\s*,\s*"# + numberPattern + #"\s*\)?$"#
+        let barePairPattern = #"^[\(\[]?\s*"# + numberPattern + #"\s*,\s*"# + numberPattern + #"\s*[\)\]]?$"#
 
         guard let coordinateStrings = firstCoordinatePair(matching: pointTagPattern, in: trimmedReply)
                 ?? firstCoordinatePair(matching: barePairPattern, in: trimmedReply),
