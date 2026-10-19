@@ -124,6 +124,11 @@ struct CompanionOverlayView: View {
     @State private var pointingTargetRectInAppKitGlobal: CGRect?
     @State private var pointingMarkOpacity: Double = 0.0
 
+    /// Where the current bezier flight ends. State rather than a captured
+    /// constant so the flight can be retargeted mid-air when the precise
+    /// element rect arrives after the flight has started.
+    @State private var navigationFlightDestination: CGPoint = .zero
+
     /// Speech bubble text shown when pointing at a detected element.
     @State private var navigationBubbleText: String = ""
     @State private var navigationBubbleOpacity: Double = 0.0
@@ -304,6 +309,14 @@ struct CompanionOverlayView: View {
 
             startNavigatingToElement(screenLocation: screenLocation)
         }
+        .onChange(of: companionManager.detectedElementTargetRect) { newTargetRect in
+            // Only the overlay already flying to or pointing at the element
+            // reacts; the return flight is left alone.
+            guard let newTargetRect,
+                  buddyNavigationMode != .followingCursor,
+                  !isReturningToCursor else { return }
+            retargetPointing(toTargetRectInAppKitGlobal: newTargetRect)
+        }
     }
 
     /// Which animation the skin's companion shows right now.
@@ -389,22 +402,9 @@ struct CompanionOverlayView: View {
 
         let flightDestination: CGPoint
         if let targetRectInAppKitGlobal = companionManager.detectedElementTargetRect {
-            // Park just outside the element's real bounds so the companion
-            // never covers what it is pointing at; the skin's mark hugs the rect.
-            let targetRectInOverlay = PointingGeometry.overlayLocalRect(
-                fromAppKitGlobalRect: targetRectInAppKitGlobal,
-                screenFrame: screenFrame
-            )
-            pointingTargetRectInOverlay = targetRectInOverlay
-            pointingTargetRectInAppKitGlobal = targetRectInAppKitGlobal
-            flightDestination = PointingGeometry.companionParkingPoint(
-                forTargetRectInOverlay: targetRectInOverlay,
-                overlaySize: screenFrame.size,
-                companionRadius: 10,
-                gap: 6
-            )
+            flightDestination = applyPointingTargetRect(targetRectInAppKitGlobal)
         } else {
-            // No rect (e.g. the onboarding demo): sit beside the point —
+            // No rect: sit beside the point —
             // 8px to the right, 12px below — clamped to the screen.
             let targetInSwiftUI = convertScreenPointToSwiftUICoordinates(screenLocation)
             pointingTargetRectInOverlay = nil
@@ -430,6 +430,39 @@ struct CompanionOverlayView: View {
         }
     }
 
+    /// Stores the rect the skin's mark hugs and returns where the companion
+    /// parks: just outside the rect, so it never covers what it points at.
+    private func applyPointingTargetRect(_ targetRectInAppKitGlobal: CGRect) -> CGPoint {
+        let targetRectInOverlay = PointingGeometry.overlayLocalRect(
+            fromAppKitGlobalRect: targetRectInAppKitGlobal,
+            screenFrame: screenFrame
+        )
+        pointingTargetRectInOverlay = targetRectInOverlay
+        pointingTargetRectInAppKitGlobal = targetRectInAppKitGlobal
+        return PointingGeometry.companionParkingPoint(
+            forTargetRectInOverlay: targetRectInOverlay,
+            overlaySize: screenFrame.size,
+            companionRadius: 10,
+            gap: 6
+        )
+    }
+
+    /// The precise element rect arrived after the flight began (speech never
+    /// waits for the Accessibility lookup). Mid-flight, the flight bends onto
+    /// the new parking point; once parked, the companion hops there and the
+    /// mark redraws around the element.
+    private func retargetPointing(toTargetRectInAppKitGlobal targetRectInAppKitGlobal: CGRect) {
+        let updatedParkingPoint = applyPointingTargetRect(targetRectInAppKitGlobal)
+        switch buddyNavigationMode {
+        case .navigatingToTarget:
+            navigationFlightDestination = updatedParkingPoint
+        case .pointingAtTarget:
+            animateBezierFlightArc(to: updatedParkingPoint) {}
+        case .followingCursor:
+            break
+        }
+    }
+
     /// Animates the buddy along a quadratic bezier arc from its current position
     /// to the specified destination, scaling up at the midpoint for a
     /// "swooping" feel. Skins never rotate the companion.
@@ -441,6 +474,7 @@ struct CompanionOverlayView: View {
 
         let startPosition = cursorPosition
         let endPosition = destination
+        navigationFlightDestination = destination
 
         let deltaX = endPosition.x - startPosition.x
         let deltaY = endPosition.y - startPosition.y
@@ -468,7 +502,7 @@ struct CompanionOverlayView: View {
             if currentFrame > totalFrames {
                 self.navigationAnimationTimer?.invalidate()
                 self.navigationAnimationTimer = nil
-                self.cursorPosition = endPosition
+                self.cursorPosition = self.navigationFlightDestination
                 self.buddyFlightScale = 1.0
                 onComplete()
                 return
@@ -482,12 +516,15 @@ struct CompanionOverlayView: View {
 
             // Quadratic bezier: B(t) = (1-t)²·P0 + 2(1-t)t·P1 + t²·P2
             let oneMinusT = 1.0 - t
+            // The end point is read every frame: it moves if the flight is
+            // retargeted onto the precise element rect.
+            let currentEndPosition = self.navigationFlightDestination
             let bezierX = oneMinusT * oneMinusT * startPosition.x
                         + 2.0 * oneMinusT * t * controlPoint.x
-                        + t * t * endPosition.x
+                        + t * t * currentEndPosition.x
             let bezierY = oneMinusT * oneMinusT * startPosition.y
                         + 2.0 * oneMinusT * t * controlPoint.y
-                        + t * t * endPosition.y
+                        + t * t * currentEndPosition.y
 
             self.cursorPosition = CGPoint(x: bezierX, y: bezierY)
 

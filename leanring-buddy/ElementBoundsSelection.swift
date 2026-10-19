@@ -84,7 +84,8 @@ nonisolated enum ElementBoundsSelection {
             && candidate.frameInAppKitGlobal.height >= minimumElementHeight
     }
 
-    private static func fallbackResolution(appKitGlobalPoint: CGPoint, displayFrame: CGRect) -> TargetRectResolution {
+    /// Also used as the provisional target while the Accessibility lookup runs.
+    static func fallbackResolution(appKitGlobalPoint: CGPoint, displayFrame: CGRect) -> TargetRectResolution {
         let box = CGRect(
             x: appKitGlobalPoint.x - fallbackBoxSize.width / 2,
             y: appKitGlobalPoint.y - fallbackBoxSize.height / 2,

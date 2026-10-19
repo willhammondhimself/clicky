@@ -655,7 +655,7 @@ struct CompanionPanelView: View {
             Spacer()
             TextField(placeholder, text: text)
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.skinFont(size: 11, design: skinTheme.fontDesign))
                 .frame(maxWidth: 190)
         }
     }
@@ -840,7 +840,7 @@ struct CompanionPanelView: View {
 
             SecureField(isSaved ? "saved — paste to replace" : "paste key", text: draftBinding)
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.skinFont(size: 11, design: skinTheme.fontDesign))
                 .frame(maxWidth: 140)
 
             Button(action: {

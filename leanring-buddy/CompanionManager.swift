@@ -38,9 +38,12 @@ final class CompanionManager: ObservableObject {
     /// element is on, so CompanionOverlayView knows which screen overlay should animate.
     @Published var detectedElementDisplayFrame: CGRect?
     /// The rect (global AppKit coords) the skin's pointing mark is drawn
-    /// around: the Accessibility element under the point when one is found,
-    /// otherwise a small box centred on it. Set before the location.
+    /// around. Set to a small box centred on the point before the location,
+    /// then replaced by the Accessibility element's bounds when the lookup
+    /// (which runs while the reply is spoken) finds one.
     @Published var detectedElementTargetRect: CGRect?
+    /// Drops Accessibility lookups that finish after their pointing ended.
+    private var pointingRequestCounter = PointingRequestCounter()
     /// Custom speech bubble text for the pointing animation. When set,
     /// CompanionOverlayView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
@@ -217,6 +220,7 @@ final class CompanionManager: ObservableObject {
     }
 
     func clearDetectedElementLocation() {
+        pointingRequestCounter.invalidateCurrentRequest()
         detectedElementScreenLocation = nil
         detectedElementDisplayFrame = nil
         detectedElementTargetRect = nil
@@ -660,25 +664,45 @@ final class CompanionManager: ObservableObject {
                         y: appKitY + displayFrame.origin.y
                     )
 
-                    // Snap the mark to the real element under the point. Set the
-                    // rect and bubble text before the location, because setting
-                    // the location starts the flight.
-                    let targetRectResolution = await AccessibilityElementBoundsResolver.resolveTargetRect(
-                        atAppKitGlobalPoint: globalLocation,
+                    // Start the flight now, toward a small box around the point,
+                    // so speech never waits on Accessibility. The rect and bubble
+                    // text are set before the location, because setting the
+                    // location starts the flight.
+                    let pointingRequestNumber = pointingRequestCounter.beginRequest()
+                    detectedElementTargetRect = ElementBoundsSelection.fallbackResolution(
+                        appKitGlobalPoint: globalLocation,
                         displayFrame: displayFrame
-                    )
-                    // A new push-to-talk cancels this task and clears the
-                    // pointing state; never publish a stale target after that.
-                    try Task.checkCancellation()
-                    detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
+                    ).rectInAppKitGlobal
                     detectedElementBubbleText = PointingBubbleText.bubbleText(
                         elementLabel: parseResult.elementLabel,
                         fallbackPhraseIndex: Int.random(in: 0..<PointingBubbleText.fallbackPhrases.count)
                     )
-                    print("🎯 Target rect: \(targetRectResolution.source) \(targetRectResolution.rectInAppKitGlobal)")
-
                     detectedElementScreenLocation = globalLocation
                     detectedElementDisplayFrame = displayFrame
+
+                    // Then snap the mark to the real element under the point
+                    // while the reply is already being spoken. The overlay
+                    // retargets the flight (or the parked companion) when the
+                    // rect changes. The lookup is not tied to this reply's task,
+                    // so the request number drops a result that arrives after
+                    // this pointing ended or a new push-to-talk began.
+                    let lookupStartedAt = ContinuousClock.now
+                    Task {
+                        let targetRectResolution = await AccessibilityElementBoundsResolver.resolveTargetRect(
+                            atAppKitGlobalPoint: globalLocation,
+                            displayFrame: displayFrame
+                        )
+                        let lookupDuration = ContinuousClock.now - lookupStartedAt
+                        guard self.pointingRequestCounter.isCurrent(pointingRequestNumber) else {
+                            print("🎯 Target rect dropped (pointing already ended) after \(lookupDuration)")
+                            return
+                        }
+                        print("🎯 Target rect: \(targetRectResolution.source) \(targetRectResolution.rectInAppKitGlobal) after \(lookupDuration)")
+                        if targetRectResolution.source == .accessibilityElement {
+                            self.detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
+                        }
+                    }
+
                     LumenAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
                 } else {
