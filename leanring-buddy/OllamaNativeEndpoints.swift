@@ -133,7 +133,24 @@ nonisolated enum OllamaNativeEndpoints {
             "stream": false,
             "think": false,
             "keep_alive": -1,
-            "options": ["temperature": 0, "num_predict": 40, "num_ctx": 4096],
+            "options": ["temperature": 0, "num_predict": 40, "num_ctx": imageChatContextLength],
+        ])
+    }
+
+    private static let imageChatContextLength = 4096
+
+    /// Loads the image-chat model and pins it, without asking anything (an
+    /// empty messages array only loads). Same `num_ctx` as
+    /// `imageChatRequestBody`: Ollama reloads a model whose context changes,
+    /// so a preload with its default context would be thrown away by the
+    /// first real request.
+    static func imageChatModelLoadRequestBody(modelName: String) -> Data {
+        encodeBody([
+            "model": modelName,
+            "messages": [[String: Any]](),
+            "stream": false,
+            "keep_alive": -1,
+            "options": ["num_ctx": imageChatContextLength],
         ])
     }
 

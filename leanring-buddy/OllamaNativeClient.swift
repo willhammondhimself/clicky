@@ -105,6 +105,17 @@ final class OllamaNativeClient {
         return try OllamaNativeEndpoints.chatMessageContent(fromChatResponse: responseData)
     }
 
+    /// Loads the precise-pointing model into memory and pins it, so the first
+    /// `locateElement` after launch doesn't pay a multi-second cold load.
+    func loadImageChatModel(named modelName: String) async throws {
+        var request = URLRequest(url: OllamaNativeEndpoints.chatURL(nativeBaseURL: nativeBaseURL))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = OllamaNativeEndpoints.imageChatModelLoadRequestBody(modelName: modelName)
+        _ = try await perform(request)
+    }
+
     // MARK: - Private
 
     private func generateOnce(model modelName: String, systemPrompt: String, userPrompt: String, includesThinkFlag: Bool) async throws -> String {

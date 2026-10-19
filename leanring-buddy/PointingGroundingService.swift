@@ -25,6 +25,7 @@ final class PointingGroundingService: ObservableObject {
     private let appSettings: AppSettings
     private var modelProvisioner: MemoryModelProvisioner!
     private var cancellables: Set<AnyCancellable> = []
+    private var hasStartedModelPreload = false
 
     private convenience init() {
         self.init(appSettings: AppSettings.shared)
@@ -46,7 +47,10 @@ final class PointingGroundingService: ObservableObject {
             }
         )
         modelProvisioner.$provisioningState
-            .sink { [weak self] newState in self?.provisioningState = newState }
+            .sink { [weak self] newState in
+                self?.provisioningState = newState
+                if case .ready = newState { self?.preloadModelOnce() }
+            }
             .store(in: &cancellables)
 
         // @Published emits in willSet, so the setting still reads the old
@@ -107,6 +111,24 @@ final class PointingGroundingService: ObservableObject {
     }
 
     // MARK: - Private
+
+    /// Ollama only keeps the model loaded (keep_alive -1) after a request
+    /// for it, so without this the first grounding after each launch pays a
+    /// cold load of ~3.3 GB and lands after the pointing hold has ended.
+    /// Fire-and-forget, once per run; a failure only costs that cold load.
+    private func preloadModelOnce() {
+        guard !hasStartedModelPreload else { return }
+        hasStartedModelPreload = true
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.makeNativeClient().loadImageChatModel(named: PointingGroundingRequest.modelName)
+                print("🔥 Pointing model: \(PointingGroundingRequest.modelName) loaded and pinned")
+            } catch {
+                print("⚠️ Pointing model: preload failed, the first grounding will load it: \(error)")
+            }
+        }
+    }
 
     private func prepareIfEnabled(isPrecisePointingEnabled: Bool) {
         guard isPrecisePointingEnabled else { return }

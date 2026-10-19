@@ -136,6 +136,28 @@ struct OllamaNativeEndpointsTests {
         #expect(options["num_ctx"] as? Int == 4096)
     }
 
+    @Test func imageChatModelLoadBodyLoadsAndPinsWithTheSameContextAsTheRequest() throws {
+        // An empty messages array only loads the model. A different num_ctx
+        // than the real request's would make Ollama reload it on first use,
+        // so the preload would save nothing.
+        let loadBody = try jsonObject(from: OllamaNativeEndpoints.imageChatModelLoadRequestBody(modelName: "qwen3-vl:4b-instruct"))
+        let requestBody = try jsonObject(from: OllamaNativeEndpoints.imageChatRequestBody(
+            modelName: "qwen3-vl:4b-instruct",
+            systemPrompt: "sys",
+            userText: "user",
+            jpegImageData: Data([0xFF, 0xD8])
+        ))
+        #expect(loadBody["model"] as? String == "qwen3-vl:4b-instruct")
+        #expect((loadBody["messages"] as? [Any])?.isEmpty == true)
+        #expect(loadBody["stream"] as? Bool == false)
+        #expect(loadBody["keep_alive"] as? Int == -1)
+
+        let loadOptions = try #require(loadBody["options"] as? [String: Any])
+        let requestOptions = try #require(requestBody["options"] as? [String: Any])
+        #expect(loadOptions["num_ctx"] as? Int == 4096)
+        #expect(loadOptions["num_ctx"] as? Int == requestOptions["num_ctx"] as? Int)
+    }
+
     @Test func parsesChatMessageContent() throws {
         let response = Data("""
         {"model":"qwen3-vl:4b-instruct","created_at":"2026-10-19T12:00:00Z","message":{"role":"assistant","content":"[POINT:512,87]"},"done":true}
