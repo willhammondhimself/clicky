@@ -555,17 +555,17 @@ final class CompanionManager: ObservableObject {
 
     don't point at things when it would be pointless — like if the user asks a general knowledge question, or the conversation has nothing to do with what's on screen, or you'd just be pointing at something obvious they're already looking at. but if there's a specific UI element, menu, button, or area on screen that's relevant to what you're helping with, point at it.
 
-    when you point, append a coordinate tag at the very end of your response, AFTER your spoken text. the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. the origin (0,0) is the top-left corner of the image. x increases rightward, y increases downward.
+    when you point, append a coordinate tag at the very end of your response, AFTER your spoken text. give coordinates on a 0-1000 grid laid over the screenshot: 0,0 is the top-left corner and 1000,1000 is the bottom-right corner, whatever the image's pixel size. x increases rightward, y increases downward.
 
-    format: [POINT:x,y:label] where x,y are integer pixel coordinates in the screenshot's coordinate space, and label is a short 1-3 word description of the element (like "search bar" or "save button"). if the element is on the cursor's screen you can omit the screen number. if the element is on a DIFFERENT screen, append :screenN where N is the screen number from the image label (e.g. :screen2). this is important — without the screen number, the cursor will point at the wrong place.
+    format: [POINT:x,y:label] where x,y are integers from 0 to 1000 on that grid, and label is a short 1-3 word description of the element (like "search bar" or "save button"). if the element is on the cursor's screen you can omit the screen number. if the element is on a DIFFERENT screen, append :screenN where N is the screen number from the image label (e.g. :screen2). this is important — without the screen number, the cursor will point at the wrong place.
 
     if pointing wouldn't help, append [POINT:none].
 
     examples:
-    - user asks how to color grade in final cut: "you'll want to open the color inspector — it's right up in the top right area of the toolbar. click that and you'll get all the color wheels and curves. [POINT:1100,42:color inspector]"
+    - user asks how to color grade in final cut: "you'll want to open the color inspector — it's right up in the top right area of the toolbar. click that and you'll get all the color wheels and curves. [POINT:859,51:color inspector]"
     - user asks what html is: "html stands for hypertext markup language, it's basically the skeleton of every web page. curious how it connects to the css you're looking at? [POINT:none]"
-    - user asks how to commit in xcode: "see that source control menu up top? click that and hit commit, or you can use command option c as a shortcut. [POINT:285,11:source control]"
-    - element is on screen 2 (not where cursor is): "that's over on your other monitor — see the terminal window? [POINT:400,300:terminal:screen2]"
+    - user asks how to commit in xcode: "see that source control menu up top? click that and hit commit, or you can use command option c as a shortcut. [POINT:223,13:source control]"
+    - element is on screen 2 (not where cursor is): "that's over on your other monitor — see the terminal window? [POINT:313,361:terminal:screen2]"
     """
 
     /// Appended to the prompt above only while memory is on. The dynamic
@@ -635,9 +635,10 @@ final class CompanionManager: ObservableObject {
                 // Build image labels with the actual screenshot pixel dimensions
                 // so Claude's coordinate space matches the image it sees. We
                 // scale from screenshot pixels to display points ourselves.
+                // No pixel size in the label: [POINT] uses a 0-1000 grid, and a
+                // pixel size invites the model to answer in pixels instead.
                 let labeledImages = screenCaptures.map { capture in
-                    let dimensionInfo = " (image dimensions: \(capture.screenshotWidthInPixels)x\(capture.screenshotHeightInPixels) pixels)"
-                    return (data: capture.imageData, label: capture.label + dimensionInfo)
+                    (data: capture.imageData, label: capture.label)
                 }
 
                 // Pass conversation history so Claude remembers prior exchanges
@@ -691,29 +692,25 @@ final class CompanionManager: ObservableObject {
 
                 if let pointCoordinate = parseResult.coordinate,
                    let targetScreenCapture {
-                    // Claude's coordinates are in the screenshot's pixel space
-                    // (top-left origin, e.g. 1280x831). Scale to the display's
-                    // point space (e.g. 1512x982), then convert to AppKit global coords.
-                    let screenshotWidth = CGFloat(targetScreenCapture.screenshotWidthInPixels)
-                    let screenshotHeight = CGFloat(targetScreenCapture.screenshotHeightInPixels)
+                    // The model's coordinates are on a 0-1000 grid over the
+                    // screenshot (see PointingGeometry.pointingGridSize). Scale
+                    // to the display's points (e.g. 1512x982), then convert to
+                    // AppKit global coords.
                     let displayWidth = CGFloat(targetScreenCapture.displayWidthInPoints)
                     let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
                     let displayFrame = targetScreenCapture.displayFrame
 
-                    // Clamp to screenshot coordinate space
-                    let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
-                    let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
-
-                    // Scale from screenshot pixels to display points
-                    let displayLocalX = clampedX * (displayWidth / screenshotWidth)
-                    let displayLocalY = clampedY * (displayHeight / screenshotHeight)
+                    let displayLocalPoint = PointingGeometry.displayLocalPoint(
+                        fromGridPoint: pointCoordinate,
+                        displaySize: CGSize(width: displayWidth, height: displayHeight)
+                    )
 
                     // Convert from top-left origin (screenshot) to bottom-left origin (AppKit)
-                    let appKitY = displayHeight - displayLocalY
+                    let appKitY = displayHeight - displayLocalPoint.y
 
                     // Convert display-local coords to global screen coords
                     let globalLocation = CGPoint(
-                        x: displayLocalX + displayFrame.origin.x,
+                        x: displayLocalPoint.x + displayFrame.origin.x,
                         y: appKitY + displayFrame.origin.y
                     )
 

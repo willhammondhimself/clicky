@@ -13,6 +13,23 @@ import CoreGraphics
 
 nonisolated enum PointingGeometry {
 
+    /// The model gives [POINT] coordinates on a 0-1000 grid over the
+    /// screenshot (0,0 top-left, 1000,1000 bottom-right). Vision models are
+    /// trained on that grid: on a test screen, asking for screenshot pixels
+    /// instead left most points ~200 px off.
+    static let pointingGridSize: CGFloat = 1000
+
+    /// A grid point as a point on the display, top-left origin, clamped to
+    /// the display.
+    static func displayLocalPoint(fromGridPoint gridPoint: CGPoint, displaySize: CGSize) -> CGPoint {
+        let clampedGridX = min(max(gridPoint.x, 0), pointingGridSize)
+        let clampedGridY = min(max(gridPoint.y, 0), pointingGridSize)
+        return CGPoint(
+            x: clampedGridX / pointingGridSize * displaySize.width,
+            y: clampedGridY / pointingGridSize * displaySize.height
+        )
+    }
+
     static func accessibilityPoint(fromAppKitGlobalPoint appKitGlobalPoint: CGPoint, primaryScreenHeight: CGFloat) -> CGPoint {
         CGPoint(x: appKitGlobalPoint.x, y: primaryScreenHeight - appKitGlobalPoint.y)
     }

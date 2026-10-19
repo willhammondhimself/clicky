@@ -113,4 +113,20 @@ struct PointingGeometryTests {
             #expect(!targetRect.contains(parkingPoint), "\(targetRect)")
         }
     }
+
+    // MARK: - Pointing grid
+
+    @Test func gridPointsScaleToTheDisplaysPoints() {
+        // The model answers on a 0-1000 grid over the screenshot; a 1512x982
+        // display maps (500, 500) to its centre.
+        let displaySize = CGSize(width: 1512, height: 982)
+        #expect(PointingGeometry.displayLocalPoint(fromGridPoint: CGPoint(x: 500, y: 500), displaySize: displaySize) == CGPoint(x: 756, y: 491))
+        #expect(PointingGeometry.displayLocalPoint(fromGridPoint: CGPoint(x: 0, y: 0), displaySize: displaySize) == .zero)
+        #expect(PointingGeometry.displayLocalPoint(fromGridPoint: CGPoint(x: 1000, y: 1000), displaySize: displaySize) == CGPoint(x: 1512, y: 982))
+    }
+
+    @Test func gridPointsOutsideZeroToAThousandAreClampedToTheScreen() {
+        let displaySize = CGSize(width: 1000, height: 500)
+        #expect(PointingGeometry.displayLocalPoint(fromGridPoint: CGPoint(x: 1280, y: -40), displaySize: displaySize) == CGPoint(x: 1000, y: 0))
+    }
 }
