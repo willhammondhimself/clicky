@@ -44,6 +44,17 @@ final class CompanionManager: ObservableObject {
     @Published var detectedElementTargetRect: CGRect?
     /// Drops Accessibility lookups that finish after their pointing ended.
     private var pointingRequestCounter = PointingRequestCounter()
+
+    /// The reply shown as text beside the companion (Voice + text or Text
+    /// only), and when it appeared so the overlay can reveal it gradually.
+    @Published private(set) var replyBubbleText: String?
+    @Published private(set) var replyBubbleShownAt = Date()
+    private var replyBubbleHideTask: Task<Void, Never>?
+
+    /// True while the companion should get out of the way: the user is
+    /// typing, the mouse is still, or a full-screen app is in front.
+    @Published private(set) var isCompanionAutoHidden = false
+    private let companionAutoHideMonitor = CompanionAutoHideMonitor()
     /// Custom speech bubble text for the pointing animation. When set,
     /// CompanionOverlayView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
@@ -188,6 +199,7 @@ final class CompanionManager: ObservableObject {
         bindShortcutTransitions()
         bindSettingsObservation()
         memoryManager.prepareAtLaunch()
+        startCompanionAutoHide()
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
@@ -217,6 +229,46 @@ final class CompanionManager: ObservableObject {
         // the welcome animation and then the prompt bubble
         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
         isOverlayVisible = true
+    }
+
+    // MARK: - Reply Text Bubble
+
+    private func showReplyBubble(_ replyText: String) {
+        replyBubbleHideTask?.cancel()
+        replyBubbleShownAt = Date()
+        replyBubbleText = replyText
+    }
+
+    private func hideReplyBubble(afterSeconds delaySeconds: Double) {
+        replyBubbleHideTask?.cancel()
+        replyBubbleHideTask = Task {
+            try? await Task.sleep(for: .seconds(delaySeconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.3)) {
+                replyBubbleText = nil
+            }
+        }
+    }
+
+    private func clearReplyBubble() {
+        replyBubbleHideTask?.cancel()
+        replyBubbleText = nil
+    }
+
+    // MARK: - Companion Auto-Hide
+
+    private func startCompanionAutoHide() {
+        companionAutoHideMonitor.isLumenBusy = { [weak self] in
+            guard let self else { return false }
+            return self.voiceState != .idle
+                || self.detectedElementScreenLocation != nil
+                || self.replyBubbleText != nil
+                || self.showOnboardingPrompt
+        }
+        companionAutoHideMonitor.onShouldHideChange = { [weak self] shouldHide in
+            self?.isCompanionAutoHidden = shouldHide
+        }
+        companionAutoHideMonitor.start()
     }
 
     func clearDetectedElementLocation() {
@@ -434,6 +486,7 @@ final class CompanionManager: ObservableObject {
             currentResponseTask?.cancel()
             textToSpeechClient.stopPlayback()
             clearDetectedElementLocation()
+            clearReplyBubble()
 
             // Dismiss the onboarding prompt if it's showing
             if showOnboardingPrompt {
@@ -725,9 +778,19 @@ final class CompanionManager: ObservableObject {
 
                 LumenAnalytics.trackAIResponseReceived(response: spokenText)
 
+                let replyDisplayMode = appSettings.replyDisplayMode
+                let hasReplyText = !spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if replyDisplayMode.showsReplyText && hasReplyText {
+                    showReplyBubble(spokenText)
+                }
+
                 // Play the response via TTS. Keep the spinner (processing state)
                 // until the audio actually starts playing, then switch to responding.
-                if !spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Text only: no voice; the companion shows its speaking state
+                // while the text is on screen.
+                if !replyDisplayMode.speaksReply && hasReplyText {
+                    voiceState = .responding
+                } else if hasReplyText {
                     do {
                         try await textToSpeechClient.speakText(spokenText)
                         // speakText returns once audio is playing
@@ -758,10 +821,15 @@ final class CompanionManager: ObservableObject {
                 // state (the companion's speaking animation) until the reply
                 // has actually finished playing.
                 if voiceState == .responding {
-                    try await SpeechPlaybackWaiter.waitUntilPlaybackEnds {
-                        self.textToSpeechClient.isPlaying
+                    if replyDisplayMode.speaksReply {
+                        try await SpeechPlaybackWaiter.waitUntilPlaybackEnds {
+                            self.textToSpeechClient.isPlaying
+                        }
+                    } else {
+                        try await Task.sleep(for: .seconds(ReplyTextTiming.textOnlyHoldSeconds(characterCount: spokenText.count)))
                     }
                 }
+                hideReplyBubble(afterSeconds: replyDisplayMode.speaksReply ? ReplyTextTiming.secondsShownAfterSpeechEnds : 0)
             } catch is CancellationError {
                 // User spoke again — response was interrupted
             } catch {

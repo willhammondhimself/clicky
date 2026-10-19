@@ -130,6 +130,11 @@ struct SkinBubbleView: View {
     let skin: LumenSkin
     let text: String
 
+    /// A capsule on one line; stays a soft rounded card when a reply wraps.
+    private var emberBubbleShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 13, style: .continuous)
+    }
+
     var body: some View {
         let theme = SkinTheme.theme(for: skin)
         let bubbleBackground = Color(hex: theme.bubbleBackgroundHex)
@@ -141,8 +146,8 @@ struct SkinBubbleView: View {
                 .foregroundColor(bubbleText)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
-                .background(Capsule().fill(bubbleBackground.opacity(0.92)))
-                .overlay(Capsule().stroke(Color(hex: theme.markPrimaryHex).opacity(0.45), lineWidth: 1))
+                .background(emberBubbleShape.fill(bubbleBackground.opacity(0.92)))
+                .overlay(emberBubbleShape.stroke(Color(hex: theme.markPrimaryHex).opacity(0.45), lineWidth: 1))
                 .shadow(color: Color(hex: theme.companionPrimaryHex).opacity(0.35), radius: 8)
         case .instrument:
             Text(text)

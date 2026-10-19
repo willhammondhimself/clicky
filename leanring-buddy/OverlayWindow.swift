@@ -156,6 +156,13 @@ struct CompanionOverlayView: View {
     @State private var isReturningToCursor: Bool = false
 
     private let fullWelcomeMessage = "hey! i'm lumen"
+    private static let replyBubbleMaximumWidth: CGFloat = 300
+
+    /// The companion steps aside while the user types, leaves the mouse
+    /// still, or uses a full-screen app; never during the first-run welcome.
+    private var isCompanionAutoHiddenOnThisScreen: Bool {
+        companionManager.isCompanionAutoHidden && !(showWelcome && !welcomeText.isEmpty)
+    }
 
     var body: some View {
         ZStack {
@@ -214,6 +221,31 @@ struct CompanionOverlayView: View {
                     }
             }
 
+            // The reply as text beside the companion (Voice + text or Text
+            // only), revealed a little ahead of the voice. Hidden while the
+            // companion is away pointing, where the pointing bubble talks.
+            if isCursorOnThisScreen,
+               buddyNavigationMode == .followingCursor,
+               let replyBubbleText = companionManager.replyBubbleText {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timelineContext in
+                    let revealedCharacterCount = ReplyTextTiming.revealedCharacterCount(
+                        secondsSinceShown: timelineContext.date.timeIntervalSince(companionManager.replyBubbleShownAt),
+                        totalCharacterCount: replyBubbleText.count
+                    )
+                    SkinBubbleView(skin: appSettings.selectedSkin, text: String(replyBubbleText.prefix(revealedCharacterCount)))
+                        .frame(maxWidth: Self.replyBubbleMaximumWidth, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .opacity(revealedCharacterCount == 0 ? 0 : 1)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .offset(
+                    x: min(cursorPosition.x + 10, screenFrame.width - Self.replyBubbleMaximumWidth - 16),
+                    y: cursorPosition.y + 12
+                )
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
+
             // Navigation pointer bubble — shown when the companion arrives at a
             // detected element. Pops in with a scale-bounce (0.5x → 1.0x spring).
             if buddyNavigationMode == .pointingAtTarget && !navigationBubbleText.isEmpty {
@@ -250,10 +282,11 @@ struct CompanionOverlayView: View {
                 skin: appSettings.selectedSkin,
                 visualState: companionVisualState,
                 microphoneAudioPowerLevel: companionManager.currentAudioPowerLevel,
-                isVisible: buddyIsVisibleOnThisScreen && cursorOpacity > 0
+                isVisible: buddyIsVisibleOnThisScreen && !isCompanionAutoHiddenOnThisScreen && cursorOpacity > 0
             )
             .scaleEffect(buddyFlightScale)
-            .opacity(buddyIsVisibleOnThisScreen ? cursorOpacity : 0)
+            .opacity(buddyIsVisibleOnThisScreen && !isCompanionAutoHiddenOnThisScreen ? cursorOpacity : 0)
+            .animation(.easeOut(duration: 0.25), value: isCompanionAutoHiddenOnThisScreen)
             .position(cursorPosition)
             .animation(
                 buddyNavigationMode == .followingCursor

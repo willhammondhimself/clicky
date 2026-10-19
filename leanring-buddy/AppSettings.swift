@@ -130,6 +130,7 @@ final class AppSettings: ObservableObject {
         static let kokoroVoice = "settings.kokoroVoice"
         static let selectedSkin = "settings.selectedSkin"
         static let isMemoryEnabled = "settings.isMemoryEnabled"
+        static let replyDisplayMode = "settings.replyDisplayMode"
     }
 
     /// Upstream's default ElevenLabs voice ID, kept so ElevenLabs works
@@ -193,6 +194,12 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(selectedSkin.rawValue, forKey: Keys.selectedSkin) }
     }
 
+    /// Whether replies are spoken, shown as text beside the companion, or
+    /// both. Like the skin, not part of the client-rebuild merge.
+    @Published var replyDisplayMode: ReplyDisplayMode {
+        didSet { userDefaults.set(replyDisplayMode.rawValue, forKey: Keys.replyDisplayMode) }
+    }
+
     private init() {
         let storedChatProvider = userDefaults.string(forKey: Keys.chatProvider)
             .flatMap(ChatProviderKind.init(rawValue:)) ?? .ollama
@@ -216,6 +223,8 @@ final class AppSettings: ObservableObject {
 
         selectedSkin = userDefaults.string(forKey: Keys.selectedSkin)
             .flatMap(LumenSkin.init(rawValue:)) ?? .defaultSkin
+        replyDisplayMode = userDefaults.string(forKey: Keys.replyDisplayMode)
+            .flatMap(ReplyDisplayMode.init(rawValue:)) ?? .defaultMode
 
         // The upstream app stored a bare Claude model name here. It doesn't map
         // onto any of the new providers, so just clear it.

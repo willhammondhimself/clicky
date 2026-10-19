@@ -541,6 +541,7 @@ struct CompanionPanelView: View {
                     apiKeyRow(for: speechToTextSecretKey)
                 }
 
+                settingsPickerRow(title: "Replies", selection: $appSettings.replyDisplayMode)
                 settingsPickerRow(title: "Text to speech", selection: $appSettings.textToSpeechProviderKind)
                 switch appSettings.textToSpeechProviderKind {
                 case .kokoro:
@@ -644,6 +645,7 @@ struct CompanionPanelView: View {
         if let speechToTextProviderKind = kind as? SpeechToTextProviderKind { return speechToTextProviderKind.displayName }
         if let textToSpeechProviderKind = kind as? TextToSpeechProviderKind { return textToSpeechProviderKind.displayName }
         if let lumenSkin = kind as? LumenSkin { return lumenSkin.displayName }
+        if let replyDisplayMode = kind as? ReplyDisplayMode { return replyDisplayMode.displayName }
         return "\(kind)"
     }
 
