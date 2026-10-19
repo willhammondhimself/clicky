@@ -50,6 +50,13 @@ final class CompanionManager: ObservableObject {
     /// the pointing ends).
     private let pointingGroundingService = PointingGroundingService.shared
     private var preciseGroundingTask: Task<Void, Never>?
+    /// True while the grounding model is answering for the current pointing.
+    /// The overlay keeps pointing past its 3 s hold while this is set, since
+    /// the answer usually lands after that hold (PointingHoldSchedule).
+    @Published private(set) var isPreciseGroundingInFlight = false
+    /// Numbers each grounding task so a cancelled one finishing late can't
+    /// clear the flag for the one that replaced it.
+    private var preciseGroundingTaskNumber = 0
 
     /// The reply shown as text beside the companion (Voice + text or Text
     /// only), and when it appeared so the overlay can reveal it gradually.
@@ -283,15 +290,27 @@ final class CompanionManager: ObservableObject {
     }
 
     func clearDetectedElementLocation() {
+        endPointingRequest()
+        detectedElementScreenLocation = nil
+        detectedElementDisplayFrame = nil
+        detectedElementTargetRect = nil
+        detectedElementBubbleText = nil
+    }
+
+    /// The overlay started flying back: rects arriving now would be ignored
+    /// by the overlay, so the pointing ends here rather than on landing, and
+    /// a grounded rect that comes too late is logged as dropped, not shown.
+    func pointingReturnFlightStarted() {
+        endPointingRequest()
+    }
+
+    private func endPointingRequest() {
         pointingRequestCounter.invalidateCurrentRequest()
         // Its answer could no longer be shown, and the GPU is better left to
         // the next reply's chat model.
         preciseGroundingTask?.cancel()
         preciseGroundingTask = nil
-        detectedElementScreenLocation = nil
-        detectedElementDisplayFrame = nil
-        detectedElementTargetRect = nil
-        detectedElementBubbleText = nil
+        isPreciseGroundingInFlight = false
     }
 
     func stop() {
@@ -928,7 +947,15 @@ final class CompanionManager: ObservableObject {
         let groundingStartedAt = ContinuousClock.now
 
         preciseGroundingTask?.cancel()
+        preciseGroundingTaskNumber += 1
+        let thisGroundingTaskNumber = preciseGroundingTaskNumber
+        isPreciseGroundingInFlight = true
         preciseGroundingTask = Task {
+            defer {
+                if self.preciseGroundingTaskNumber == thisGroundingTaskNumber {
+                    self.isPreciseGroundingInFlight = false
+                }
+            }
             do {
                 // Nil: the reply had no usable point (the service logged it).
                 guard let groundedGridPoint = try await self.pointingGroundingService.locateGridPoint(

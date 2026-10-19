@@ -355,6 +355,16 @@ struct CompanionOverlayView: View {
                   !isReturningToCursor else { return }
             retargetPointing(toTargetRectInAppKitGlobal: newTargetRect)
         }
+        .onChange(of: companionManager.isPreciseGroundingInFlight) { isGroundingInFlight in
+            // A hold kept open for the grounding answer ends at once when the
+            // request finishes without moving the mark.
+            guard !isGroundingInFlight,
+                  buddyNavigationMode == .pointingAtTarget,
+                  !isReturningToCursor else { return }
+            if let flyBack = pointingHoldSchedule.correctionFinished(atSeconds: ProcessInfo.processInfo.systemUptime) {
+                scheduleFlyBackToCursor(flyBack)
+            }
+        }
     }
 
     /// Which animation the skin's companion shows right now.
@@ -612,11 +622,26 @@ struct CompanionOverlayView: View {
 
     /// Fades the mark and bubble when the hold ends, then flies back. Does
     /// nothing if the hold was restarted, a new pointing began or this one
-    /// already ended (the schedule's generation moved on).
+    /// already ended (the schedule's generation moved on). While the
+    /// grounding model is still answering, keeps pointing until the
+    /// schedule's cap instead.
     private func scheduleFlyBackToCursor(_ flyBack: PointingHoldSchedule.FlyBack) {
         DispatchQueue.main.asyncAfter(deadline: .now() + flyBack.delaySeconds) {
-            guard self.pointingHoldSchedule.isCurrent(flyBack.generation),
-                  self.buddyNavigationMode == .pointingAtTarget else { return }
+            guard self.buddyNavigationMode == .pointingAtTarget else { return }
+            let holdEndOutcome = self.pointingHoldSchedule.holdTimerFired(
+                generation: flyBack.generation,
+                atSeconds: ProcessInfo.processInfo.systemUptime,
+                isCorrectionPending: self.companionManager.isPreciseGroundingInFlight
+            )
+            switch holdEndOutcome {
+            case .stale:
+                return
+            case .waitForCorrection(let capFlyBack):
+                self.scheduleFlyBackToCursor(capFlyBack)
+                return
+            case .flyBack:
+                break
+            }
             self.navigationBubbleOpacity = 0.0
             self.pointingMarkOpacity = 0.0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -668,6 +693,7 @@ struct CompanionOverlayView: View {
 
         buddyNavigationMode = .navigatingToTarget
         isReturningToCursor = true
+        companionManager.pointingReturnFlightStarted()
 
         animateBezierFlightArc(to: cursorWithTrackingOffset) {
             self.finishNavigationAndResumeFollowing()
