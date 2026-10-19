@@ -124,6 +124,11 @@ struct CompanionOverlayView: View {
     @State private var pointingTargetRectInAppKitGlobal: CGRect?
     @State private var pointingMarkOpacity: Double = 0.0
 
+    /// When the companion flies back: 3 s after the bubble, restarted when
+    /// the precise rect arrives late, capped at 8 s past the bubble. Stale
+    /// fly-back timers check its generation and do nothing.
+    @State private var pointingHoldSchedule = PointingHoldSchedule()
+
     /// Where the current bezier flight ends. State rather than a captured
     /// constant so the flight can be retargeted mid-air when the precise
     /// element rect arrives after the flight has started.
@@ -433,6 +438,9 @@ struct CompanionOverlayView: View {
         // Don't interrupt welcome animation
         guard !showWelcome || welcomeText.isEmpty else { return }
 
+        // A fly-back timer from an earlier pointing must not end this one.
+        pointingHoldSchedule.beginPointing()
+
         let flightDestination: CGPoint
         if let targetRectInAppKitGlobal = companionManager.detectedElementTargetRect {
             flightDestination = applyPointingTargetRect(targetRectInAppKitGlobal)
@@ -483,7 +491,9 @@ struct CompanionOverlayView: View {
     /// The precise element rect arrived after the flight began (speech never
     /// waits for the Accessibility lookup). Mid-flight, the flight bends onto
     /// the new parking point; once parked, the companion hops there and the
-    /// mark redraws around the element.
+    /// mark redraws around the element. The grounded rect can arrive 3-4 s
+    /// into the reply, so the hold restarts to give the corrected mark its
+    /// full 3 s (within the schedule's cap).
     private func retargetPointing(toTargetRectInAppKitGlobal targetRectInAppKitGlobal: CGRect) {
         let updatedParkingPoint = applyPointingTargetRect(targetRectInAppKitGlobal)
         switch buddyNavigationMode {
@@ -491,6 +501,13 @@ struct CompanionOverlayView: View {
             navigationFlightDestination = updatedParkingPoint
         case .pointingAtTarget:
             animateBezierFlightArc(to: updatedParkingPoint) {}
+            if let extendedFlyBack = pointingHoldSchedule.targetRectChanged(atSeconds: ProcessInfo.processInfo.systemUptime) {
+                // The fade may already have started in the last half second
+                // of the old hold; bring the mark and bubble back.
+                pointingMarkOpacity = 1.0
+                navigationBubbleOpacity = 1.0
+                scheduleFlyBackToCursor(extendedFlyBack)
+            }
         case .followingCursor:
             break
         }
@@ -588,14 +605,24 @@ struct CompanionOverlayView: View {
 
         streamNavigationBubbleCharacter(phrase: pointerPhrase, characterIndex: 0) {
             // All characters streamed — hold for 3 seconds, then fly back
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                guard self.buddyNavigationMode == .pointingAtTarget else { return }
-                self.navigationBubbleOpacity = 0.0
-                self.pointingMarkOpacity = 0.0
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    guard self.buddyNavigationMode == .pointingAtTarget else { return }
-                    self.startFlyingBackToCursor()
-                }
+            let flyBack = self.pointingHoldSchedule.bubbleFinishedStreaming(atSeconds: ProcessInfo.processInfo.systemUptime)
+            self.scheduleFlyBackToCursor(flyBack)
+        }
+    }
+
+    /// Fades the mark and bubble when the hold ends, then flies back. Does
+    /// nothing if the hold was restarted, a new pointing began or this one
+    /// already ended (the schedule's generation moved on).
+    private func scheduleFlyBackToCursor(_ flyBack: PointingHoldSchedule.FlyBack) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + flyBack.delaySeconds) {
+            guard self.pointingHoldSchedule.isCurrent(flyBack.generation),
+                  self.buddyNavigationMode == .pointingAtTarget else { return }
+            self.navigationBubbleOpacity = 0.0
+            self.pointingMarkOpacity = 0.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard self.pointingHoldSchedule.isCurrent(flyBack.generation),
+                      self.buddyNavigationMode == .pointingAtTarget else { return }
+                self.startFlyingBackToCursor()
             }
         }
     }
@@ -662,6 +689,7 @@ struct CompanionOverlayView: View {
     private func finishNavigationAndResumeFollowing() {
         navigationAnimationTimer?.invalidate()
         navigationAnimationTimer = nil
+        pointingHoldSchedule.endPointing()
         buddyNavigationMode = .followingCursor
         isReturningToCursor = false
         buddyFlightScale = 1.0
