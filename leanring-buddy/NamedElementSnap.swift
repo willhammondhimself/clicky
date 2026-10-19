@@ -12,6 +12,7 @@
 //
 
 import CoreGraphics
+import Foundation
 
 nonisolated struct LabeledElementCandidate: Equatable {
     /// The element's title, description or value as Accessibility reports it.

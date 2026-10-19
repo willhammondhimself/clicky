@@ -3,7 +3,9 @@
 # Typechecks the app sources from the terminal without building an app
 # bundle (building with xcodebuild from the terminal resets the app's TCC
 # permissions, so it is never used here). Mirrors the app target's settings:
-# macOS 14.2 target, main-actor default isolation.
+# macOS 14.2 target, main-actor default isolation, and MemberImportVisibility
+# (each file must import the module that defines what it uses; without it this
+# script passed files Xcode rejects).
 #
 # Sources that import FluidAudio need the module Xcode compiled, so run
 # Cmd+B in Xcode at least once; the script finds it in DerivedData.
@@ -34,6 +36,7 @@ output="$(xcrun swiftc -typecheck \
     -target arm64-apple-macos14.2 \
     -parse-as-library \
     -default-isolation MainActor \
+    -enable-upcoming-feature MemberImportVisibility \
     $module_flags \
     leanring-buddy/*.swift 2>&1 || true)"
 
