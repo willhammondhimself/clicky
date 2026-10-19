@@ -42,8 +42,14 @@ final class CompanionManager: ObservableObject {
     /// then replaced by the Accessibility element's bounds when the lookup
     /// (which runs while the reply is spoken) finds one.
     @Published var detectedElementTargetRect: CGRect?
-    /// Drops Accessibility lookups that finish after their pointing ended.
+    /// Drops Accessibility lookups that finish after their pointing ended,
+    /// and keeps the chat model's rect from replacing the grounded one.
     private var pointingRequestCounter = PointingRequestCounter()
+    /// Precise pointing: the small local vision model that finds the exact
+    /// spot after the reply starts, and its in-flight request (cancelled when
+    /// the pointing ends).
+    private let pointingGroundingService = PointingGroundingService.shared
+    private var preciseGroundingTask: Task<Void, Never>?
 
     /// The reply shown as text beside the companion (Voice + text or Text
     /// only), and when it appeared so the overlay can reveal it gradually.
@@ -202,6 +208,7 @@ final class CompanionManager: ObservableObject {
         bindShortcutTransitions()
         bindSettingsObservation()
         memoryManager.prepareAtLaunch()
+        pointingGroundingService.prepareAtLaunch()
         startCompanionAutoHide()
         accessibilityTreeActivator.start()
 
@@ -277,6 +284,10 @@ final class CompanionManager: ObservableObject {
 
     func clearDetectedElementLocation() {
         pointingRequestCounter.invalidateCurrentRequest()
+        // Its answer could no longer be shown, and the GPU is better left to
+        // the next reply's chat model.
+        preciseGroundingTask?.cancel()
+        preciseGroundingTask = nil
         detectedElementScreenLocation = nil
         detectedElementDisplayFrame = nil
         detectedElementTargetRect = nil
@@ -694,28 +705,21 @@ final class CompanionManager: ObservableObject {
                     return screenCaptures.first(where: { $0.isCursorScreen })
                 }()
 
+                // Set when this reply points, so precise pointing can ask the
+                // grounding model about the same screenshot once speech starts.
+                var pointingNumberForPreciseGrounding: Int?
+
                 if let pointCoordinate = parseResult.coordinate,
                    let targetScreenCapture {
                     // The model's coordinates are on a 0-1000 grid over the
                     // screenshot (see PointingGeometry.pointingGridSize). Scale
                     // to the display's points (e.g. 1512x982), then convert to
                     // AppKit global coords.
-                    let displayWidth = CGFloat(targetScreenCapture.displayWidthInPoints)
-                    let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
                     let displayFrame = targetScreenCapture.displayFrame
-
-                    let displayLocalPoint = PointingGeometry.displayLocalPoint(
+                    let globalLocation = PointingGeometry.appKitGlobalPoint(
                         fromGridPoint: pointCoordinate,
-                        displaySize: CGSize(width: displayWidth, height: displayHeight)
-                    )
-
-                    // Convert from top-left origin (screenshot) to bottom-left origin (AppKit)
-                    let appKitY = displayHeight - displayLocalPoint.y
-
-                    // Convert display-local coords to global screen coords
-                    let globalLocation = CGPoint(
-                        x: displayLocalPoint.x + displayFrame.origin.x,
-                        y: appKitY + displayFrame.origin.y
+                        displaySize: Self.displaySizeInPoints(of: targetScreenCapture),
+                        displayFrame: displayFrame
                     )
 
                     // Start the flight now, toward a small box around the point,
@@ -754,9 +758,16 @@ final class CompanionManager: ObservableObject {
                         }
                         print("🎯 Target rect: \(targetRectResolution.source) \(targetRectResolution.rectInAppKitGlobal) after \(lookupDuration)")
                         if targetRectResolution.source != .fallbackBox {
+                            // A slow app can make this finish after precise
+                            // pointing already moved the mark; that one wins.
+                            guard self.pointingRequestCounter.claimTargetRect(forRequest: pointingRequestNumber, from: .lookupAtChatModelPoint) else {
+                                print("🎯 Target rect at the chat model's point dropped (grounded rect already shown)")
+                                return
+                            }
                             self.detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
                         }
                     }
+                    pointingNumberForPreciseGrounding = pointingRequestNumber
 
                     LumenAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
@@ -810,6 +821,17 @@ final class CompanionManager: ObservableObject {
                 }
 
                 guard !Task.isCancelled else { return }
+
+                // The reply is audible (or on screen) now, so the grounding
+                // model no longer competes with the chat model for the GPU.
+                // Runs on its own; speech never waits for it.
+                if let pointingNumberForPreciseGrounding, let targetScreenCapture {
+                    startPreciseGroundingIfPossible(
+                        pointingRequestNumber: pointingNumberForPreciseGrounding,
+                        targetScreenCapture: targetScreenCapture,
+                        elementLabel: parseResult.elementLabel
+                    )
+                }
 
                 // Audio is already playing; the daily-note line is written in
                 // the background and never delays speech.
@@ -876,6 +898,75 @@ final class CompanionManager: ObservableObject {
             guard !Task.isCancelled else { return }
             overlayWindowManager.fadeOutAndHideOverlay()
             isOverlayVisible = false
+        }
+    }
+
+    // MARK: - Precise Pointing
+
+    private static func displaySizeInPoints(of screenCapture: CompanionScreenCapture) -> CGSize {
+        CGSize(width: CGFloat(screenCapture.displayWidthInPoints), height: CGFloat(screenCapture.displayHeightInPoints))
+    }
+
+    /// Asks the small grounding model where the `[POINT]` label's element is
+    /// in the same screenshot the chat model saw, then moves the mark to the
+    /// element at that spot. The companion is already at the chat model's
+    /// point; this only corrects it, and only while that pointing is still
+    /// current. Every failure keeps the existing mark.
+    private func startPreciseGroundingIfPossible(
+        pointingRequestNumber: Int,
+        targetScreenCapture: CompanionScreenCapture,
+        elementLabel: String?
+    ) {
+        guard let elementLabel,
+              PointingGroundingRequest.isGroundableLabel(elementLabel),
+              pointingRequestCounter.isCurrent(pointingRequestNumber),
+              pointingGroundingService.isReadyToGround() else { return }
+
+        let displayFrame = targetScreenCapture.displayFrame
+        let displaySize = Self.displaySizeInPoints(of: targetScreenCapture)
+        let screenshotJPEGData = targetScreenCapture.imageData
+        let groundingStartedAt = ContinuousClock.now
+
+        preciseGroundingTask?.cancel()
+        preciseGroundingTask = Task {
+            do {
+                // Nil: the reply had no usable point (the service logged it).
+                guard let groundedGridPoint = try await self.pointingGroundingService.locateGridPoint(
+                    forLabel: elementLabel,
+                    jpegImageData: screenshotJPEGData
+                ) else { return }
+                guard !Task.isCancelled, self.pointingRequestCounter.isCurrent(pointingRequestNumber) else {
+                    print("🎯 Grounded \(elementLabel) dropped (pointing already ended)")
+                    return
+                }
+
+                let groundedGlobalLocation = PointingGeometry.appKitGlobalPoint(
+                    fromGridPoint: groundedGridPoint,
+                    displaySize: displaySize,
+                    displayFrame: displayFrame
+                )
+                // Whatever the resolution's source: even the fallback box at
+                // the grounded point beats a box at the chat model's point.
+                let groundedTargetRectResolution = await AccessibilityElementBoundsResolver.resolveTargetRect(
+                    atAppKitGlobalPoint: groundedGlobalLocation,
+                    displayFrame: displayFrame,
+                    pointingLabel: elementLabel
+                )
+                let groundingDuration = ContinuousClock.now - groundingStartedAt
+                guard !Task.isCancelled,
+                      self.pointingRequestCounter.claimTargetRect(forRequest: pointingRequestNumber, from: .lookupAtGroundedPoint) else {
+                    print("🎯 Grounded \(elementLabel) dropped (pointing already ended) after \(groundingDuration)")
+                    return
+                }
+                self.detectedElementTargetRect = groundedTargetRectResolution.rectInAppKitGlobal
+                print("🎯 Grounded \(elementLabel): grid (\(Int(groundedGridPoint.x)),\(Int(groundedGridPoint.y))) → \(groundedTargetRectResolution.source) \(groundedTargetRectResolution.rectInAppKitGlobal) after \(groundingDuration)")
+            } catch {
+                if Task.isCancelled {
+                    print("🎯 Grounded \(elementLabel) cancelled (pointing ended)")
+                } else {
+                    print("⚠️ Precise pointing failed for \(elementLabel), keeping the first mark: \(error)")
+                }
+            }
         }
     }
 
