@@ -151,7 +151,7 @@ nonisolated enum AccessibilityElementBoundsResolver {
     }
 
     /// Named elements around the point, for NamedElementSnap: hit-tests a
-    /// 5×5 grid out to 80 points and walks up to two parents from each hit.
+    /// 9×9 grid (every 20 points, out to 80) and walks up to two parents from each hit.
     /// A text run inside a control (the "Resign" text in a button) is reported
     /// with the control's frame, so the mark hugs the whole button.
     private static func collectLabelledCandidatesNearby(

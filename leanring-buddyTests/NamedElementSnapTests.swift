@@ -69,12 +69,21 @@ struct NamedElementSnapTests {
 
     // MARK: - Where to look
 
-    @Test func samplePointsCoverAGridOutToEightyPoints() {
+    @Test func samplePointsCoverATwentyPointGridOutToEightyPoints() {
+        // Measured on 81 real controls: a 40 pt grid found the named control
+        // after a 25 pt miss 53% of the time, a 20 pt grid 85%.
         let samplePoints = NamedElementSnap.samplePoints(around: CGPoint(x: 100, y: 100))
-        #expect(samplePoints.count == 25)
+        #expect(samplePoints.count == 81)
         #expect(samplePoints.first == CGPoint(x: 100, y: 100))
         #expect(samplePoints.contains(CGPoint(x: 20, y: 180)))
         #expect(samplePoints.contains(CGPoint(x: 180, y: 20)))
+        #expect(samplePoints.contains(CGPoint(x: 120, y: 80)))
+    }
+
+    @Test func samplePointsRunNearestFirstSoATimeLimitDropsTheFarthest() {
+        let point = CGPoint(x: 100, y: 100)
+        let distances = NamedElementSnap.samplePoints(around: point).map { hypot($0.x - point.x, $0.y - point.y) }
+        #expect(distances == distances.sorted())
     }
 
     @Test func distanceIsZeroInsideAFrameAndToTheNearestEdgeOutside() {

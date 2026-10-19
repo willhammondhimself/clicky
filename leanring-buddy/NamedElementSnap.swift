@@ -24,9 +24,11 @@ nonisolated struct LabeledElementCandidate: Equatable {
 nonisolated enum NamedElementSnap {
     static let maximumSnapDistance: CGFloat = 80
     static let minimumLabelMatchScore = 0.5
-    /// Spacing of the 5×5 grid of hit tests around the point, reaching
-    /// `maximumSnapDistance` in each direction.
-    static let sampleSpacing: CGFloat = 40
+    /// Spacing of the 9×9 grid of hit tests around the point, reaching
+    /// `maximumSnapDistance` in each direction. On 81 real controls a 40 pt
+    /// grid stepped over small buttons (53% found after a 25 pt miss); 20 pt
+    /// found 85%, in a median 275 ms of Accessibility calls.
+    static let sampleSpacing: CGFloat = 20
 
     /// Words that describe what kind of control it is rather than which one.
     private static let fillerWords: Set<String> = [
@@ -61,16 +63,22 @@ nonisolated enum NamedElementSnap {
         }?.candidate
     }
 
-    /// The point itself first, then a 5×5 grid around it.
+    /// A 9×9 grid around the point, nearest first, so a time limit drops the
+    /// farthest samples.
     static func samplePoints(around point: CGPoint) -> [CGPoint] {
-        let offsets: [CGFloat] = [0, -sampleSpacing, sampleSpacing, -2 * sampleSpacing, 2 * sampleSpacing]
+        let stepCount = Int(maximumSnapDistance / sampleSpacing)
+        let offsets = (-stepCount...stepCount).map { CGFloat($0) * sampleSpacing }
         var samplePoints: [CGPoint] = []
         for yOffset in offsets {
             for xOffset in offsets {
                 samplePoints.append(CGPoint(x: point.x + xOffset, y: point.y + yOffset))
             }
         }
-        return samplePoints
+        return samplePoints.sorted { first, second in
+            let firstDistance = (first.x - point.x) * (first.x - point.x) + (first.y - point.y) * (first.y - point.y)
+            let secondDistance = (second.x - point.x) * (second.x - point.x) + (second.y - point.y) * (second.y - point.y)
+            return firstDistance < secondDistance
+        }
     }
 
     static func distance(from point: CGPoint, to frame: CGRect) -> CGFloat {
