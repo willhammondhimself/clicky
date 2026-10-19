@@ -132,7 +132,7 @@ final class AppSettings: ObservableObject {
         static let isMemoryEnabled = "settings.isMemoryEnabled"
     }
 
-    /// Voice ID Farza shipped with; kept as the default so ElevenLabs works
+    /// Upstream's default ElevenLabs voice ID, kept so ElevenLabs works
     /// the moment a key is pasted.
     static let defaultElevenLabsVoiceID = "kPzsL2i3teMYv0FxEYQ6"
 

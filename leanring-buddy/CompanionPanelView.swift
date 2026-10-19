@@ -15,7 +15,6 @@ struct CompanionPanelView: View {
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var kokoroVoiceEngine = KokoroVoiceEngine.shared
     @ObservedObject private var memoryManager = MemoryManager.shared
-    @State private var emailInput: String = ""
     @State private var isAISettingsExpanded: Bool = false
     /// Draft text for each API key field. Keys are written to the Keychain
     /// only when the user clicks Save, never on every keystroke.
@@ -55,23 +54,6 @@ struct CompanionPanelView: View {
                     .frame(height: 16)
 
                 startButton
-                    .padding(.horizontal, 16)
-            }
-
-            // Show Lumen toggle — hidden for now
-            // if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-            //     Spacer()
-            //         .frame(height: 16)
-            //
-            //     showLumenCursorToggleRow
-            //         .padding(.horizontal, 16)
-            // }
-
-            if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-                Spacer()
-                    .frame(height: 16)
-
-                dmFarzaButton
                     .padding(.horizontal, 16)
             }
 
@@ -141,16 +123,6 @@ struct CompanionPanelView: View {
                 .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
                 .foregroundColor(panelTextSecondaryColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if companionManager.allPermissionsGranted && !companionManager.hasSubmittedEmail {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Drop your email to get started.")
-                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
-                    .foregroundColor(panelTextSecondaryColor)
-                Text("If I keep building this, I'll keep you in the loop.")
-                    .font(.skinFont(size: 11, design: skinTheme.fontDesign))
-                    .foregroundColor(panelTextTertiaryColor)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         } else if companionManager.allPermissionsGranted {
             Text("You're all set. Hit Start to meet Lumen.")
                 .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
@@ -182,71 +154,33 @@ struct CompanionPanelView: View {
 
                 Text("Lumen only takes a screenshot while you hold the hot key. Nothing is captured in the background.")
                     .font(.skinFont(size: 11, design: skinTheme.fontDesign))
-                    .foregroundColor(Color(red: 0.9, green: 0.4, blue: 0.4))
+                    .foregroundColor(panelAccentColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    // MARK: - Email + Start Button
+    // MARK: - Start Button
 
     @ViewBuilder
     private var startButton: some View {
         if !companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-            if !companionManager.hasSubmittedEmail {
-                VStack(spacing: 8) {
-                    TextField("Enter your email", text: $emailInput)
-                        .textFieldStyle(.plain)
-                        .font(.skinFont(size: 13, design: skinTheme.fontDesign))
-                        .foregroundColor(panelTextPrimaryColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                                .fill(panelControlFillColor)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                                .stroke(panelBorderColor, lineWidth: 0.5)
-                        )
-
-                    Button(action: {
-                        companionManager.submitEmail(emailInput)
-                    }) {
-                        Text("Submit")
-                            .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
-                            .foregroundColor(panelOnAccentColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
-                                    .fill(emailInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                          ? panelAccentColor.opacity(0.4)
-                                          : panelAccentColor)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .pointerCursor()
-                    .disabled(emailInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            } else {
-                Button(action: {
-                    companionManager.triggerOnboarding()
-                }) {
-                    Text("Start")
-                        .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
-                        .foregroundColor(panelOnAccentColor)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
-                                .fill(panelAccentColor)
-                        )
-                }
-                .buttonStyle(.plain)
-                .pointerCursor()
+            Button(action: {
+                companionManager.triggerOnboarding()
+            }) {
+                Text("Start")
+                    .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelOnAccentColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
+                            .fill(panelAccentColor)
+                    )
             }
+            .buttonStyle(.plain)
+            .pointerCursor()
         }
     }
 
@@ -554,35 +488,6 @@ struct CompanionPanelView: View {
     }
 
 
-
-    // MARK: - Show Lumen Cursor Toggle
-
-    private var showLumenCursorToggleRow: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "cursorarrow")
-                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
-                    .foregroundColor(panelTextTertiaryColor)
-                    .frame(width: 16)
-
-                Text("Show Lumen")
-                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
-                    .foregroundColor(panelTextSecondaryColor)
-            }
-
-            Spacer()
-
-            Toggle("", isOn: Binding(
-                get: { companionManager.isLumenCursorEnabled },
-                set: { companionManager.setLumenCursorEnabled($0) }
-            ))
-            .toggleStyle(.switch)
-            .labelsHidden()
-            .tint(panelAccentColor)
-            .scaleEffect(0.8)
-        }
-        .padding(.vertical, 4)
-    }
 
     private var speechToTextProviderRow: some View {
         HStack {
@@ -977,43 +882,6 @@ struct CompanionPanelView: View {
         })
     }
 
-    // MARK: - DM Farza Button
-
-    private var dmFarzaButton: some View {
-        Button(action: {
-            if let url = URL(string: "https://x.com/farzatv") {
-                NSWorkspace.shared.open(url)
-            }
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: "bubble.left.fill")
-                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Got feedback? DM me")
-                        .font(.skinFont(size: 12, weight: .semibold, design: skinTheme.fontDesign))
-                    Text("Bugs, ideas, anything — I read every message.")
-                        .font(.skinFont(size: 10, design: skinTheme.fontDesign))
-                        .foregroundColor(panelTextTertiaryColor)
-                }
-            }
-            .foregroundColor(panelTextSecondaryColor)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                    .fill(panelControlFillColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                    .stroke(panelBorderColor, lineWidth: 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-        .pointerCursor()
-    }
-
     // MARK: - Footer
 
     private var footerSection: some View {
@@ -1032,23 +900,6 @@ struct CompanionPanelView: View {
             .buttonStyle(.plain)
             .pointerCursor()
 
-            if companionManager.hasCompletedOnboarding {
-                Spacer()
-
-                Button(action: {
-                    companionManager.replayOnboarding()
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.circle")
-                            .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
-                        Text("Watch Onboarding Again")
-                            .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
-                    }
-                    .foregroundColor(panelTextTertiaryColor)
-                }
-                .buttonStyle(.plain)
-                .pointerCursor()
-            }
         }
     }
 

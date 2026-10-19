@@ -2,7 +2,7 @@
 //  LumenAnalytics.swift
 //  leanring-buddy
 //
-//  Analytics are disabled in this fork. Upstream sent events to Farza's
+//  Analytics are disabled in this fork. Upstream sent events to its own
 //  PostHog project; this build phones home to nobody. The method names are
 //  kept so call sites stay untouched and can be re-pointed at your own
 //  analytics later if you ever want them.
