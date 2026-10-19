@@ -37,6 +37,10 @@ final class CompanionManager: ObservableObject {
     /// The display frame (global AppKit coords) of the screen the detected
     /// element is on, so BlueCursorView knows which screen overlay should animate.
     @Published var detectedElementDisplayFrame: CGRect?
+    /// The rect (global AppKit coords) the skin's pointing mark is drawn
+    /// around: the Accessibility element under the point when one is found,
+    /// otherwise a small box centred on it. Set before the location.
+    @Published var detectedElementTargetRect: CGRect?
     /// Custom speech bubble text for the pointing animation. When set,
     /// BlueCursorView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
@@ -306,6 +310,7 @@ final class CompanionManager: ObservableObject {
     func clearDetectedElementLocation() {
         detectedElementScreenLocation = nil
         detectedElementDisplayFrame = nil
+        detectedElementTargetRect = nil
         detectedElementBubbleText = nil
     }
 
@@ -703,15 +708,10 @@ final class CompanionManager: ObservableObject {
                     spokenText = spokenText.isEmpty ? spokenConfirmation : spokenText + " " + spokenConfirmation
                 }
 
-                // Handle element pointing if Claude returned coordinates.
-                // Switch to idle BEFORE setting the location so the triangle
-                // becomes visible and can fly to the target. Without this, the
-                // spinner hides the triangle and the flight animation is invisible.
-                let hasPointCoordinate = parseResult.coordinate != nil
-                if hasPointCoordinate {
-                    voiceState = .idle
-                }
-
+                // Handle element pointing if the model returned coordinates.
+                // The overlay shows the companion in flight whatever the voice
+                // state is (CompanionVisualState.flying wins), so the voice
+                // state is left alone here.
                 // Pick the screen capture matching Claude's screen number,
                 // falling back to the cursor screen if not specified.
                 let targetScreenCapture: CompanionScreenCapture? = {
@@ -749,6 +749,20 @@ final class CompanionManager: ObservableObject {
                         x: displayLocalX + displayFrame.origin.x,
                         y: appKitY + displayFrame.origin.y
                     )
+
+                    // Snap the mark to the real element under the point. Set the
+                    // rect and bubble text before the location, because setting
+                    // the location starts the flight.
+                    let targetRectResolution = await AccessibilityElementBoundsResolver.resolveTargetRect(
+                        atAppKitGlobalPoint: globalLocation,
+                        displayFrame: displayFrame
+                    )
+                    detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
+                    detectedElementBubbleText = PointingBubbleText.bubbleText(
+                        elementLabel: parseResult.elementLabel,
+                        fallbackPhraseIndex: Int.random(in: 0..<PointingBubbleText.fallbackPhrases.count)
+                    )
+                    print("🎯 Target rect: \(targetRectResolution.source) \(targetRectResolution.rectInAppKitGlobal)")
 
                     detectedElementScreenLocation = globalLocation
                     detectedElementDisplayFrame = displayFrame
