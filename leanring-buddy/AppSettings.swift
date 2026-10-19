@@ -130,6 +130,7 @@ final class AppSettings: ObservableObject {
         static let kokoroVoice = "settings.kokoroVoice"
         static let selectedSkin = "settings.selectedSkin"
         static let isMemoryEnabled = "settings.isMemoryEnabled"
+        static let isPrecisePointingEnabled = "settings.isPrecisePointingEnabled"
         static let replyDisplayMode = "settings.replyDisplayMode"
         static let microphonePreference = "settings.microphonePreference"
     }
@@ -188,6 +189,14 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(isMemoryEnabled, forKey: Keys.isMemoryEnabled) }
     }
 
+    /// Whether a second, small local vision model (qwen3-vl via Ollama) finds
+    /// the exact pointing spot after the reply starts. See
+    /// PointingGroundingService. On by default; like memory, not part of
+    /// CompanionManager's client-rebuild merge.
+    @Published var isPrecisePointingEnabled: Bool {
+        didSet { userDefaults.set(isPrecisePointingEnabled, forKey: Keys.isPrecisePointingEnabled) }
+    }
+
     /// Which look the companion, panel and menu bar icon use. Not part of
     /// CompanionManager's client-rebuild merge: switching skins never touches
     /// the chat or voice clients.
@@ -227,6 +236,9 @@ final class AppSettings: ObservableObject {
         isMemoryEnabled = userDefaults.object(forKey: Keys.isMemoryEnabled) == nil
             ? true
             : userDefaults.bool(forKey: Keys.isMemoryEnabled)
+        isPrecisePointingEnabled = userDefaults.object(forKey: Keys.isPrecisePointingEnabled) == nil
+            ? true
+            : userDefaults.bool(forKey: Keys.isPrecisePointingEnabled)
 
         selectedSkin = userDefaults.string(forKey: Keys.selectedSkin)
             .flatMap(LumenSkin.init(rawValue:)) ?? .defaultSkin

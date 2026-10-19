@@ -2,9 +2,10 @@
 //  OllamaNativeClient.swift
 //  leanring-buddy
 //
-//  Thin URLSession wrapper over Ollama's native API for the memory feature:
-//  list installed models, pull one with progress, embed texts, generate a
-//  short completion. URL building and parsing live in OllamaNativeEndpoints
+//  Thin URLSession wrapper over Ollama's native API for the memory feature
+//  and precise pointing: list installed models, pull one with progress,
+//  embed texts, generate a short completion, locate an element in a
+//  screenshot. URL building and parsing live in OllamaNativeEndpoints
 //  (unit-tested); this file is only the I/O.
 //
 
@@ -84,6 +85,24 @@ final class OllamaNativeClient {
         } catch let statusError as HTTPStatusError where statusError.statusCode == 400 {
             return try await generateOnce(model: modelName, systemPrompt: systemPrompt, userPrompt: userPrompt, includesThinkFlag: false)
         }
+    }
+
+    /// Asks a vision model where an element is in one screenshot (precise
+    /// pointing) and returns its raw reply. 20 s covers a cold model load;
+    /// a warm answer takes ~2.5-4 s.
+    func locateElement(model modelName: String, systemPrompt: String, userText: String, jpegImageData: Data) async throws -> String {
+        var request = URLRequest(url: OllamaNativeEndpoints.chatURL(nativeBaseURL: nativeBaseURL))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = OllamaNativeEndpoints.imageChatRequestBody(
+            modelName: modelName,
+            systemPrompt: systemPrompt,
+            userText: userText,
+            jpegImageData: jpegImageData
+        )
+        let responseData = try await perform(request)
+        return try OllamaNativeEndpoints.chatMessageContent(fromChatResponse: responseData)
     }
 
     // MARK: - Private

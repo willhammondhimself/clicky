@@ -15,6 +15,7 @@ struct CompanionPanelView: View {
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var kokoroVoiceEngine = KokoroVoiceEngine.shared
     @ObservedObject private var memoryManager = MemoryManager.shared
+    @ObservedObject private var pointingGroundingService = PointingGroundingService.shared
     @State private var isAISettingsExpanded: Bool = false
     /// Draft text for each API key field. Keys are written to the Keychain
     /// only when the user clicks Save, never on every keystroke.
@@ -563,6 +564,13 @@ struct CompanionPanelView: View {
                     memoryActionsRow
                 }
 
+                settingsSubsectionLabel("POINTING")
+                    .padding(.top, 4)
+                settingsToggleRow(title: "Precise pointing", isOn: $appSettings.isPrecisePointingEnabled)
+                if appSettings.isPrecisePointingEnabled {
+                    pointingModelStatusRow
+                }
+
                 Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Kokoro to run fully offline.")
                     .font(.skinFont(size: 10, design: skinTheme.fontDesign))
                     .foregroundColor(panelTextTertiaryColor)
@@ -809,6 +817,43 @@ struct CompanionPanelView: View {
             .foregroundColor(panelTextSecondaryColor)
             .pointerCursor()
 
+            Spacer()
+        }
+    }
+
+    // MARK: - Pointing rows
+
+    /// Mirrors the memory row for the local grounding model that refines
+    /// where the companion points, with Retry on failure.
+    private var pointingModelStatusRow: some View {
+        HStack(spacing: 6) {
+            switch pointingGroundingService.provisioningState {
+            case .notChecked:
+                kokoroStatusText("uses a local qwen3-vl model (~3.3 GB), checked at launch")
+            case .checking:
+                ProgressView()
+                    .controlSize(.mini)
+                kokoroStatusText("checking the pointing model…")
+            case .pulling(let modelName, let fractionCompleted):
+                ProgressView()
+                    .controlSize(.mini)
+                if let fractionCompleted {
+                    kokoroStatusText("downloading \(modelName)… \(Int(fractionCompleted * 100))% (one time, ~3.3 GB)")
+                } else {
+                    kokoroStatusText("downloading \(modelName)… (one time, ~3.3 GB)")
+                }
+            case .ready:
+                kokoroStatusText("pointing model ready · a local qwen3-vl model refines each mark")
+            case .ollamaUnreachable(let message), .failed(let message):
+                kokoroStatusText(message + " — pointing uses the chat model's guess meanwhile")
+                Button("Retry") {
+                    pointingGroundingService.retryProvisioning()
+                }
+                .buttonStyle(.plain)
+                .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
+                .pointerCursor()
+            }
             Spacer()
         }
     }
