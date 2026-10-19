@@ -129,4 +129,27 @@ struct PointingGeometryTests {
         let displaySize = CGSize(width: 1000, height: 500)
         #expect(PointingGeometry.displayLocalPoint(fromGridPoint: CGPoint(x: 1280, y: -40), displaySize: displaySize) == CGPoint(x: 1000, y: 0))
     }
+
+    @Test func gridPointsMapToAppKitGlobalOnThePrimaryDisplay() {
+        // The chat model's point and the grounding model's point both go
+        // through this, so they land in the same space.
+        let globalPoint = PointingGeometry.appKitGlobalPoint(
+            fromGridPoint: CGPoint(x: 500, y: 100),
+            displaySize: CGSize(width: 1512, height: 982),
+            displayFrame: CGRect(x: 0, y: 0, width: 1512, height: 982)
+        )
+        // y = 982 - 98.2 (top-left grid flipped to AppKit's bottom-left).
+        #expect(abs(globalPoint.x - 756) < 0.001)
+        #expect(abs(globalPoint.y - 883.8) < 0.001)
+    }
+
+    @Test func gridPointsMapToAppKitGlobalOnADisplayLeftOfAndAbovePrimary() {
+        let globalPoint = PointingGeometry.appKitGlobalPoint(
+            fromGridPoint: CGPoint(x: 0, y: 1000),
+            displaySize: CGSize(width: 1920, height: 1080),
+            displayFrame: CGRect(x: -1920, y: 982, width: 1920, height: 1080)
+        )
+        // Bottom-left corner of that display.
+        #expect(globalPoint == CGPoint(x: -1920, y: 982))
+    }
 }

@@ -30,6 +30,19 @@ nonisolated enum PointingGeometry {
         )
     }
 
+    /// A grid point over one display's screenshot as an AppKit global point
+    /// (bottom-left origin). Both the chat model's and the grounding model's
+    /// points go through here so they land in the same space.
+    static func appKitGlobalPoint(fromGridPoint gridPoint: CGPoint, displaySize: CGSize, displayFrame: CGRect) -> CGPoint {
+        let pointOnDisplay = displayLocalPoint(fromGridPoint: gridPoint, displaySize: displaySize)
+        // The screenshot's origin is top-left; AppKit's is bottom-left.
+        let appKitYOnDisplay = displaySize.height - pointOnDisplay.y
+        return CGPoint(
+            x: pointOnDisplay.x + displayFrame.origin.x,
+            y: appKitYOnDisplay + displayFrame.origin.y
+        )
+    }
+
     static func accessibilityPoint(fromAppKitGlobalPoint appKitGlobalPoint: CGPoint, primaryScreenHeight: CGFloat) -> CGPoint {
         CGPoint(x: appKitGlobalPoint.x, y: primaryScreenHeight - appKitGlobalPoint.y)
     }
