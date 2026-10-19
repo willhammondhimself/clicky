@@ -72,7 +72,7 @@ One place per skin declares everything visual (builder chooses the exact shape; 
 
 | | Ember | Instrument | Marginalia (default) |
 |---|---|---|---|
-| Companion | warm orb (cream → amber → coral radial), soft glow | thin ring with tick marks, signal-orange core | ink dot (#1b1535 on light, paper-coloured on dark screens: see below) |
+| Companion | warm orb (cream → amber → coral radial), soft glow | thin ring with tick marks, signal-orange core | ink dot (#1b1535) with a thin paper-coloured halo |
 | Listening | aura ripples, mic-level scaled | ticks step/pulse with mic level | ink aura ripples, mic-level scaled |
 | Thinking | 2–3 satellites orbit | orange sweep arc rotates | small ink dots orbit (Ember's motion in ink) |
 | Speaking | orb pulses | core pulses | dot pulses |
@@ -85,6 +85,8 @@ One place per skin declares everything visual (builder chooses the exact shape; 
 Colours, sizes and timings come from the look board cards; the board's CSS is the reference for each value.
 
 Readability on any wallpaper: an ink dot vanishes on dark windows. Each skin's companion and marks carry a contrasting halo (Marginalia: thin paper-coloured outline around ink strokes; Instrument: a dark 1 pt outline around orange; Ember already glows).
+
+*Builder's-check ruling (my call, 2026-10-19):* each skin has one fixed palette. Skins do not follow macOS light/dark mode and do not sample the pixels under the companion; legibility on dark or light windows comes only from the halo, which also applies to Marginalia's ink circle and to Instrument's brackets and readout. The light Marginalia and Instrument panels stay light in dark mode.
 
 Fonts: system designs only (`.serif` = New York, `.monospaced` = SF Mono, `.rounded` = SF Pro Rounded). No bundled fonts.
 
