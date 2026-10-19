@@ -55,6 +55,9 @@ final class CompanionManager: ObservableObject {
     /// typing, the mouse is still, or a full-screen app is in front.
     @Published private(set) var isCompanionAutoHidden = false
     private let companionAutoHideMonitor = CompanionAutoHideMonitor()
+    /// Asks Electron apps to build their Accessibility tree as they come to
+    /// the front, so pointing can hug real elements in them.
+    private let accessibilityTreeActivator = AccessibilityTreeActivator()
     /// Custom speech bubble text for the pointing animation. When set,
     /// CompanionOverlayView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
@@ -200,6 +203,7 @@ final class CompanionManager: ObservableObject {
         bindSettingsObservation()
         memoryManager.prepareAtLaunch()
         startCompanionAutoHide()
+        accessibilityTreeActivator.start()
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
