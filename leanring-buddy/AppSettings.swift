@@ -128,6 +128,7 @@ final class AppSettings: ObservableObject {
         static let appleVoiceIdentifier = "settings.appleVoiceIdentifier"
         static let elevenLabsVoiceID = "settings.elevenLabsVoiceID"
         static let kokoroVoice = "settings.kokoroVoice"
+        static let selectedSkin = "settings.selectedSkin"
         static let isMemoryEnabled = "settings.isMemoryEnabled"
     }
 
@@ -185,6 +186,13 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(isMemoryEnabled, forKey: Keys.isMemoryEnabled) }
     }
 
+    /// Which look the companion, panel and menu bar icon use. Not part of
+    /// CompanionManager's client-rebuild merge: switching skins never touches
+    /// the chat or voice clients.
+    @Published var selectedSkin: LumenSkin {
+        didSet { userDefaults.set(selectedSkin.rawValue, forKey: Keys.selectedSkin) }
+    }
+
     private init() {
         let storedChatProvider = userDefaults.string(forKey: Keys.chatProvider)
             .flatMap(ChatProviderKind.init(rawValue:)) ?? .ollama
@@ -205,6 +213,9 @@ final class AppSettings: ObservableObject {
         isMemoryEnabled = userDefaults.object(forKey: Keys.isMemoryEnabled) == nil
             ? true
             : userDefaults.bool(forKey: Keys.isMemoryEnabled)
+
+        selectedSkin = userDefaults.string(forKey: Keys.selectedSkin)
+            .flatMap(LumenSkin.init(rawValue:)) ?? .defaultSkin
 
         // The upstream app stored a bare Claude model name here. It doesn't map
         // onto any of the new providers, so just clear it.
