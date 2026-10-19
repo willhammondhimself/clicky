@@ -740,7 +740,8 @@ final class CompanionManager: ObservableObject {
                     Task {
                         let targetRectResolution = await AccessibilityElementBoundsResolver.resolveTargetRect(
                             atAppKitGlobalPoint: globalLocation,
-                            displayFrame: displayFrame
+                            displayFrame: displayFrame,
+                            pointingLabel: parseResult.elementLabel
                         )
                         let lookupDuration = ContinuousClock.now - lookupStartedAt
                         guard self.pointingRequestCounter.isCurrent(pointingRequestNumber) else {
@@ -748,7 +749,7 @@ final class CompanionManager: ObservableObject {
                             return
                         }
                         print("🎯 Target rect: \(targetRectResolution.source) \(targetRectResolution.rectInAppKitGlobal) after \(lookupDuration)")
-                        if targetRectResolution.source == .accessibilityElement {
+                        if targetRectResolution.source != .fallbackBox {
                             self.detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
                         }
                     }

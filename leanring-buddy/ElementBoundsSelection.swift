@@ -25,6 +25,8 @@ nonisolated struct AccessibilityElementCandidate: Equatable {
 
 nonisolated enum TargetRectSource: Equatable {
     case accessibilityElement
+    /// A nearby element whose name matches the model's [POINT] label.
+    case labelledElementNearby
     case fallbackBox
 }
 
@@ -70,7 +72,7 @@ nonisolated enum ElementBoundsSelection {
         return TargetRectResolution(rectInAppKitGlobal: clippedRect, source: .accessibilityElement)
     }
 
-    private static func isUsable(_ candidate: AccessibilityElementCandidate, displayFrame: CGRect) -> Bool {
+    static func isUsable(_ candidate: AccessibilityElementCandidate, displayFrame: CGRect) -> Bool {
         if let role = candidate.role, containerRoles.contains(role) { return false }
         let frame = candidate.frameInAppKitGlobal
         if frame.isNull || frame.isEmpty { return false }
