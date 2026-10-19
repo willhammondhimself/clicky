@@ -121,7 +121,7 @@ The selection rules (role filter, size thresholds, walk-up, clipping, coordinate
 Visible in the running app today and replaced or removed:
 - Blue triangle companion, triangle menu bar icon, blue bubble fills (replaced by skins).
 - App icon: the blue triangle (replaced by one new Lumen icon, see 6).
-- Onboarding: the welcome types "hey! i'm lumen" in a blue bubble (kept, skinned). The onboarding video streamed from upstream's Mux account (Farza's video), its background music `ff.mp3`, the email capture ("Drop your email…", sends nowhere), the "Got feedback? DM me" button linking to Farza's X account, and "Watch Onboarding Again": **see open questions**.
+- Onboarding: the welcome types "hey! i'm lumen" in a blue bubble (kept, skinned). The onboarding video streamed from upstream's Mux account (Farza's video), its background music `ff.mp3`, the email capture ("Drop your email…", sends nowhere), the "Got feedback? DM me" button linking to Farza's X account, and "Watch Onboarding Again" are removed (see Will's answers).
 - System prompts that describe "a small blue triangle cursor" / "a small blue cursor buddy" become look-neutral ("you can point at things on the user's screen").
 - Dictation key terms "makesomething", "Learning Buddy", "Codex" (upstream leftovers) are removed or replaced with "Lumen".
 - Unused upstream assets (steve.jpg, Codex/makesomething screenshots, discord/google logos, enter.mp3, eshop.mp3) and the makesomething `appcast.xml` are deleted.
@@ -145,6 +145,7 @@ One icon for Lumen, in the default look: an ink dot with its listening aura on a
 - Whether to add a "Preview" button next to the skin picker that plays the companion states at the cursor.
 - Probing a few nearby points when the first hit misses.
 
-## Open questions (Will's)
+## Will's answers (2026-10-19)
 
-1. Upstream onboarding: delete the Farza video, music, email capture, DM button and "Watch Onboarding Again" outright and keep a short skinned welcome, or replace them with a new Lumen onboarding?
+- **Design approved** ("Yes, plan it").
+- **Onboarding:** strip upstream's first run now and design a proper Lumen onboarding separately later. For this build, everything upstream goes: the streamed Farza video and its 40 s demo trigger, the `ff.mp3` music, the email field and `hasSubmittedEmail` gate, the "Got feedback? DM me" button, "Watch Onboarding Again", the first-run pointing demo and its prompt. Interim first run (builder keeps it minimal): grant permissions → Start sets `hasCompletedOnboarding` → skinned "hey! i'm lumen" bubble → the "press control + option and introduce yourself" prompt bubble.

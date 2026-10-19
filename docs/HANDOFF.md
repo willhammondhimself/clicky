@@ -13,7 +13,7 @@ hold Ctrl+Option → Apple Speech (on-device) → screenshot → `gemma4:26b` on
 - **Consequences for Will on first Cmd+R:** macOS sees a new app, so re-grant Microphone, Accessibility, Screen Recording and Screen Content; re-enter API keys (the Keychain service changed); UserDefaults start fresh (provider, voice and model fall back to the local defaults). Remove the old Clicky entry from System Settings → General → Login Items, and quit any running Clicky (`pgrep -fl Clicky.app`).
 - `ApplicationSupportFolderMigration` moves `~/Library/Application Support/Clicky` to `.../Lumen` on first access of either storage path, so memory notes and the Kokoro models survive. If both folders exist nothing is moved. Existing `PROFILE.md` text still says "clicky"; edit by hand.
 - `TEST_HOST` in the test targets pointed at a non-existent `leanring-buddy.app` while the product was named Clicky; it now points at `Lumen.app`. Unverified until Will runs Cmd+U.
-- Visual redesign is a separate step: look board at the published artifact "Lumen look board", four directions (A Ember, B Instrument, C Marginalia, D Aperture). The blue cursor, menu bar triangle, panel palette and app icon are still upstream's until Will picks.
+- Skins design approved 2026-10-19: `docs/superpowers/specs/2026-10-19-skins-design.md` (Ember, Instrument, Marginalia; default Marginalia with Ember's motion; pointing snaps to Accessibility element bounds; upstream onboarding stripped, a new Lumen onboarding is designed later). Memory demo video in `docs/media/` (linked from PR #1 and the README).
 
 **Memory (2026-10-17, implemented, not yet run by Will):**
 - `~/Library/Application Support/Lumen/Memory/PROFILE.md` (starter prefilled about Will; `- ` bullets under `## About me / Projects / Tools / Preferences / Notes`) and `notes/YYYY-MM-DD.md` (`HH:MM · App · summary` lines) plus `notes/index.json` (embeddings).
@@ -76,7 +76,7 @@ Kokoro models live in `~/Library/Application Support/Lumen/Models` (~380 MB afte
 
 ## NEXT FEATURE: wake word
 
-Per the roadmap agreed in the brainstorm: memory (done, above), then **wake word** (Porcupine or openWakeWord; FluidAudio has VAD and Parakeet STT), then proactive triggers (narrow, opt-in — HeyClicky removed theirs for annoyance/privacy), then background tasks (Cua/Peekaboo). Run the superpowers brainstorming skill (architectural path) first; Will likes being grilled with AskUserQuestion.
+Per the roadmap agreed in the brainstorm: memory (done, above), then skins (approved), a new Lumen onboarding, Echo-style activity features (timeline, focus sessions + distraction guard, focus stats, contextual hints), then **wake word** (Porcupine or openWakeWord; FluidAudio has VAD and Parakeet STT), then proactive triggers (narrow, opt-in — HeyClicky removed theirs for annoyance/privacy), then background tasks (Cua/Peekaboo). Run the superpowers brainstorming skill (architectural path) first; Will likes being grilled with AskUserQuestion.
 
 Also parked: a Jev/OpenJev-style "chooser" model (one-pass option scoring) for accessibility-tree pointing and local/cloud routing; `qwen3-vl` Ollama tag for better pointing; Chatterbox voice cloning and Parakeet STT via the same FluidAudio package.
 
