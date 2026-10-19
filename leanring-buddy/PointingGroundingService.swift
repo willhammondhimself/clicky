@@ -49,11 +49,13 @@ final class PointingGroundingService: ObservableObject {
             .sink { [weak self] newState in self?.provisioningState = newState }
             .store(in: &cancellables)
 
+        // @Published emits in willSet, so the setting still reads the old
+        // value inside this sink; the emitted value is passed on instead.
         appSettings.$isPrecisePointingEnabled
             .dropFirst()
             .removeDuplicates()
             .sink { [weak self] isEnabled in
-                if isEnabled { self?.prepareAtLaunch() }
+                self?.prepareIfEnabled(isPrecisePointingEnabled: isEnabled)
             }
             .store(in: &cancellables)
     }
@@ -61,10 +63,7 @@ final class PointingGroundingService: ObservableObject {
     /// Checks for the grounding model and pulls it in the background when
     /// precise pointing is on. Safe to call again.
     func prepareAtLaunch() {
-        guard appSettings.isPrecisePointingEnabled else { return }
-        Task { [weak self] in
-            await self?.modelProvisioner.prepareIfNeeded()
-        }
+        prepareIfEnabled(isPrecisePointingEnabled: appSettings.isPrecisePointingEnabled)
     }
 
     func retryProvisioning() {
@@ -76,11 +75,16 @@ final class PointingGroundingService: ObservableObject {
     /// Whether a grounding request may go out now: precise pointing is on
     /// and the model is installed. While Ollama was unreachable (it may have
     /// come up since launch) this starts a re-check, which the provisioner
-    /// throttles, and answers false for this reply.
+    /// throttles, and answers false for this reply. A check that never ran
+    /// (the setting was off at launch) starts here too, so a missed toggle
+    /// can't leave precise pointing off for the whole session.
     func isReadyToGround() -> Bool {
         guard appSettings.isPrecisePointingEnabled else { return false }
-        if case .ollamaUnreachable = modelProvisioner.provisioningState {
+        switch modelProvisioner.provisioningState {
+        case .ollamaUnreachable, .notChecked:
             prepareAtLaunch()
+        default:
+            break
         }
         return modelProvisioner.isReady
     }
@@ -103,6 +107,13 @@ final class PointingGroundingService: ObservableObject {
     }
 
     // MARK: - Private
+
+    private func prepareIfEnabled(isPrecisePointingEnabled: Bool) {
+        guard isPrecisePointingEnabled else { return }
+        Task { [weak self] in
+            await self?.modelProvisioner.prepareIfNeeded()
+        }
+    }
 
     struct OllamaURLError: LocalizedError {
         var errorDescription: String? { "the ollama base url in settings is not a valid url" }

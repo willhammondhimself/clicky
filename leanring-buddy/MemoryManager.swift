@@ -85,11 +85,13 @@ final class MemoryManager: ObservableObject {
             .sink { [weak self] newState in self?.provisioningState = newState }
             .store(in: &cancellables)
 
+        // @Published emits in willSet, so the setting still reads the old
+        // value inside this sink; the emitted value is passed on instead.
         appSettings.$isMemoryEnabled
             .dropFirst()
             .removeDuplicates()
             .sink { [weak self] isEnabled in
-                if isEnabled { self?.prepareAtLaunch() }
+                self?.prepareIfEnabled(isMemoryEnabled: isEnabled)
             }
             .store(in: &cancellables)
     }
@@ -99,6 +101,10 @@ final class MemoryManager: ObservableObject {
     /// Creates the memory folder and starter profile, then checks/pulls the
     /// Ollama models in the background. Safe to call again.
     func prepareAtLaunch() {
+        prepareIfEnabled(isMemoryEnabled: isMemoryEnabled)
+    }
+
+    private func prepareIfEnabled(isMemoryEnabled: Bool) {
         guard isMemoryEnabled else { return }
         Task { [weak self] in
             guard let self else { return }
