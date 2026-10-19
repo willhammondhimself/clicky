@@ -27,7 +27,7 @@ struct CompanionPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             panelHeader
             Divider()
-                .background(DS.Colors.borderSubtle)
+                .background(panelBorderColor)
                 .padding(.horizontal, 16)
 
             permissionsCopySection
@@ -79,7 +79,7 @@ struct CompanionPanelView: View {
                 .frame(height: 12)
 
             Divider()
-                .background(DS.Colors.borderSubtle)
+                .background(panelBorderColor)
                 .padding(.horizontal, 16)
 
             footerSection
@@ -103,26 +103,26 @@ struct CompanionPanelView: View {
                     .shadow(color: statusDotColor.opacity(0.6), radius: 4)
 
                 Text("Lumen")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(DS.Colors.textPrimary)
+                    .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextPrimaryColor)
             }
 
             Spacer()
 
             Text(statusText)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textTertiary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextTertiaryColor)
 
             Button(action: {
                 NotificationCenter.default.post(name: .lumenDismissPanel, object: nil)
             }) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .frame(width: 20, height: 20)
                     .background(
                         Circle()
-                            .fill(Color.white.opacity(0.08))
+                            .fill(panelControlFillColor)
                     )
             }
             .buttonStyle(.plain)
@@ -138,50 +138,50 @@ struct CompanionPanelView: View {
     private var permissionsCopySection: some View {
         if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
             Text("Hold Control+Option to talk.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if companionManager.allPermissionsGranted && !companionManager.hasSubmittedEmail {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Drop your email to get started.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
                 Text("If I keep building this, I'll keep you in the loop.")
-                    .font(.system(size: 11))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 11, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if companionManager.allPermissionsGranted {
             Text("You're all set. Hit Start to meet Lumen.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if companionManager.hasCompletedOnboarding {
             // Permissions were revoked after onboarding — tell user to re-grant
             VStack(alignment: .leading, spacing: 6) {
                 Text("Permissions needed")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 12, weight: .bold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
 
                 Text("Some permissions were revoked. Grant all four below to keep using Lumen.")
-                    .font(.system(size: 11))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 11, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Hi, I'm Lumen.")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 12, weight: .bold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
 
                 Text("A voice assistant that lives in your menu bar, runs on your Mac, and can see your screen when you ask.")
-                    .font(.system(size: 11))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 11, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("Lumen only takes a screenshot while you hold the hot key. Nothing is captured in the background.")
-                    .font(.system(size: 11))
+                    .font(.skinFont(size: 11, design: skinTheme.fontDesign))
                     .foregroundColor(Color(red: 0.9, green: 0.4, blue: 0.4))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -198,32 +198,32 @@ struct CompanionPanelView: View {
                 VStack(spacing: 8) {
                     TextField("Enter your email", text: $emailInput)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .foregroundColor(DS.Colors.textPrimary)
+                        .font(.skinFont(size: 13, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextPrimaryColor)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(
                             RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
+                                .fill(panelControlFillColor)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                                .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                                .stroke(panelBorderColor, lineWidth: 0.5)
                         )
 
                     Button(action: {
                         companionManager.submitEmail(emailInput)
                     }) {
                         Text("Submit")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(DS.Colors.textOnAccent)
+                            .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
+                            .foregroundColor(panelOnAccentColor)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(
                                 RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
                                     .fill(emailInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                          ? DS.Colors.accent.opacity(0.4)
-                                          : DS.Colors.accent)
+                                          ? panelAccentColor.opacity(0.4)
+                                          : panelAccentColor)
                             )
                     }
                     .buttonStyle(.plain)
@@ -235,13 +235,13 @@ struct CompanionPanelView: View {
                     companionManager.triggerOnboarding()
                 }) {
                     Text("Start")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(DS.Colors.textOnAccent)
+                        .font(.skinFont(size: 14, weight: .semibold, design: skinTheme.fontDesign))
+                        .foregroundColor(panelOnAccentColor)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: DS.CornerRadius.large, style: .continuous)
-                                .fill(DS.Colors.accent)
+                                .fill(panelAccentColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -255,8 +255,8 @@ struct CompanionPanelView: View {
     private var settingsSection: some View {
         VStack(spacing: 2) {
             Text("PERMISSIONS")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundColor(DS.Colors.textTertiary)
+                .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextTertiaryColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 6)
 
@@ -278,13 +278,13 @@ struct CompanionPanelView: View {
         return HStack {
             HStack(spacing: 8) {
                 Image(systemName: "hand.raised")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isGranted ? DS.Colors.textTertiary : DS.Colors.warning)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(isGranted ? panelTextTertiaryColor : DS.Colors.warning)
                     .frame(width: 16)
 
                 Text("Accessibility")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
@@ -295,7 +295,7 @@ struct CompanionPanelView: View {
                         .fill(DS.Colors.success)
                         .frame(width: 6, height: 6)
                     Text("Granted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         .foregroundColor(DS.Colors.success)
                 }
             } else {
@@ -306,13 +306,13 @@ struct CompanionPanelView: View {
                         WindowPositionManager.requestAccessibilityPermission()
                     }) {
                         Text("Grant")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(DS.Colors.textOnAccent)
+                            .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                            .foregroundColor(panelOnAccentColor)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(
                                 Capsule()
-                                    .fill(DS.Colors.accent)
+                                    .fill(panelAccentColor)
                             )
                     }
                     .buttonStyle(.plain)
@@ -326,13 +326,13 @@ struct CompanionPanelView: View {
                         WindowPositionManager.openAccessibilitySettings()
                     }) {
                         Text("Find App")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(DS.Colors.textSecondary)
+                            .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                            .foregroundColor(panelTextSecondaryColor)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(
                                 Capsule()
-                                    .stroke(DS.Colors.borderSubtle, lineWidth: 0.8)
+                                    .stroke(panelBorderColor, lineWidth: 0.8)
                             )
                     }
                     .buttonStyle(.plain)
@@ -348,20 +348,20 @@ struct CompanionPanelView: View {
         return HStack {
             HStack(spacing: 8) {
                 Image(systemName: "rectangle.dashed.badge.record")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isGranted ? DS.Colors.textTertiary : DS.Colors.warning)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(isGranted ? panelTextTertiaryColor : DS.Colors.warning)
                     .frame(width: 16)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Screen Recording")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(DS.Colors.textSecondary)
+                        .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextSecondaryColor)
 
                     Text(isGranted
                          ? "Only takes a screenshot when you use the hotkey"
                          : "Quit and reopen after granting")
-                        .font(.system(size: 10))
-                        .foregroundColor(DS.Colors.textTertiary)
+                        .font(.skinFont(size: 10, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextTertiaryColor)
                 }
             }
 
@@ -373,7 +373,7 @@ struct CompanionPanelView: View {
                         .fill(DS.Colors.success)
                         .frame(width: 6, height: 6)
                     Text("Granted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         .foregroundColor(DS.Colors.success)
                 }
             } else {
@@ -384,13 +384,13 @@ struct CompanionPanelView: View {
                     WindowPositionManager.requestScreenRecordingPermission()
                 }) {
                     Text("Grant")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DS.Colors.textOnAccent)
+                        .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                        .foregroundColor(panelOnAccentColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(DS.Colors.accent)
+                                .fill(panelAccentColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -405,13 +405,13 @@ struct CompanionPanelView: View {
         return HStack {
             HStack(spacing: 8) {
                 Image(systemName: "eye")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isGranted ? DS.Colors.textTertiary : DS.Colors.warning)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(isGranted ? panelTextTertiaryColor : DS.Colors.warning)
                     .frame(width: 16)
 
                 Text("Screen Content")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
@@ -422,7 +422,7 @@ struct CompanionPanelView: View {
                         .fill(DS.Colors.success)
                         .frame(width: 6, height: 6)
                     Text("Granted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         .foregroundColor(DS.Colors.success)
                 }
             } else {
@@ -430,13 +430,13 @@ struct CompanionPanelView: View {
                     companionManager.requestScreenContentPermission()
                 }) {
                     Text("Grant")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DS.Colors.textOnAccent)
+                        .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                        .foregroundColor(panelOnAccentColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(DS.Colors.accent)
+                                .fill(panelAccentColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -451,13 +451,13 @@ struct CompanionPanelView: View {
         return HStack {
             HStack(spacing: 8) {
                 Image(systemName: "mic")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isGranted ? DS.Colors.textTertiary : DS.Colors.warning)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(isGranted ? panelTextTertiaryColor : DS.Colors.warning)
                     .frame(width: 16)
 
                 Text("Microphone")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
@@ -468,7 +468,7 @@ struct CompanionPanelView: View {
                         .fill(DS.Colors.success)
                         .frame(width: 6, height: 6)
                     Text("Granted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         .foregroundColor(DS.Colors.success)
                 }
             } else {
@@ -485,13 +485,13 @@ struct CompanionPanelView: View {
                     }
                 }) {
                     Text("Grant")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DS.Colors.textOnAccent)
+                        .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                        .foregroundColor(panelOnAccentColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(DS.Colors.accent)
+                                .fill(panelAccentColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -510,13 +510,13 @@ struct CompanionPanelView: View {
         HStack {
             HStack(spacing: 8) {
                 Image(systemName: iconName)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isGranted ? DS.Colors.textTertiary : DS.Colors.warning)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(isGranted ? panelTextTertiaryColor : DS.Colors.warning)
                     .frame(width: 16)
 
                 Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
@@ -527,7 +527,7 @@ struct CompanionPanelView: View {
                         .fill(DS.Colors.success)
                         .frame(width: 6, height: 6)
                     Text("Granted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         .foregroundColor(DS.Colors.success)
                 }
             } else {
@@ -537,13 +537,13 @@ struct CompanionPanelView: View {
                     }
                 }) {
                     Text("Grant")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DS.Colors.textOnAccent)
+                        .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                        .foregroundColor(panelOnAccentColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(DS.Colors.accent)
+                                .fill(panelAccentColor)
                         )
                 }
                 .buttonStyle(.plain)
@@ -561,13 +561,13 @@ struct CompanionPanelView: View {
         HStack {
             HStack(spacing: 8) {
                 Image(systemName: "cursorarrow")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .frame(width: 16)
 
                 Text("Show Lumen")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
@@ -578,7 +578,7 @@ struct CompanionPanelView: View {
             ))
             .toggleStyle(.switch)
             .labelsHidden()
-            .tint(DS.Colors.accent)
+            .tint(panelAccentColor)
             .scaleEffect(0.8)
         }
         .padding(.vertical, 4)
@@ -588,20 +588,20 @@ struct CompanionPanelView: View {
         HStack {
             HStack(spacing: 8) {
                 Image(systemName: "mic.badge.waveform")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .frame(width: 16)
 
                 Text("Speech to Text")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(DS.Colors.textSecondary)
+                    .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextSecondaryColor)
             }
 
             Spacer()
 
             Text(companionManager.buddyDictationManager.transcriptionProviderDisplayName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(DS.Colors.textTertiary)
+                .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextTertiaryColor)
         }
         .padding(.vertical, 4)
     }
@@ -613,7 +613,11 @@ struct CompanionPanelView: View {
             aiSettingsHeaderRow
 
             if isAISettingsExpanded {
+                settingsSubsectionLabel("APPEARANCE")
+                settingsPickerRow(title: "Skin", selection: $appSettings.selectedSkin)
+
                 settingsSubsectionLabel("MODEL")
+                    .padding(.top, 4)
                 settingsPickerRow(title: "Provider", selection: $appSettings.chatProviderKind)
 
                 if appSettings.chatProviderKind.usesOpenAICompatibleAPI {
@@ -653,8 +657,8 @@ struct CompanionPanelView: View {
                 }
 
                 Text("Keys are stored in your macOS Keychain. Leave everything on Ollama + Kokoro to run fully offline.")
-                    .font(.system(size: 10))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 10, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
@@ -672,11 +676,11 @@ struct CompanionPanelView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AI Settings")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(DS.Colors.textSecondary)
+                        .font(.skinFont(size: 13, weight: .medium, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextSecondaryColor)
                     Text(activeStackSummary)
-                        .font(.system(size: 10))
-                        .foregroundColor(DS.Colors.textTertiary)
+                        .font(.skinFont(size: 10, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextTertiaryColor)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -684,8 +688,8 @@ struct CompanionPanelView: View {
                 Spacer()
 
                 Image(systemName: isAISettingsExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextTertiaryColor)
             }
             .contentShape(Rectangle())
         }
@@ -703,8 +707,8 @@ struct CompanionPanelView: View {
 
     private func settingsSubsectionLabel(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .foregroundColor(DS.Colors.textTertiary)
+            .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+            .foregroundColor(panelTextTertiaryColor)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -714,8 +718,8 @@ struct CompanionPanelView: View {
     ) -> some View where Kind.AllCases: RandomAccessCollection {
         HStack {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
             Spacer()
             Picker("", selection: selection) {
                 ForEach(Array(Kind.allCases)) { kind in
@@ -728,20 +732,21 @@ struct CompanionPanelView: View {
         }
     }
 
-    /// The three provider enums each expose `displayName`; this keeps the
+    /// The provider enums and LumenSkin each expose `displayName`; this keeps the
     /// generic picker row from needing a shared protocol.
     private func displayName<Kind>(for kind: Kind) -> String {
         if let chatProviderKind = kind as? ChatProviderKind { return chatProviderKind.displayName }
         if let speechToTextProviderKind = kind as? SpeechToTextProviderKind { return speechToTextProviderKind.displayName }
         if let textToSpeechProviderKind = kind as? TextToSpeechProviderKind { return textToSpeechProviderKind.displayName }
+        if let lumenSkin = kind as? LumenSkin { return lumenSkin.displayName }
         return "\(kind)"
     }
 
     private func settingsTextFieldRow(title: String, text: Binding<String>, placeholder: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
             Spacer()
             TextField(placeholder, text: text)
                 .textFieldStyle(.roundedBorder)
@@ -754,8 +759,8 @@ struct CompanionPanelView: View {
         let availableVoices = AppSettings.availableAppleVoices()
         return HStack {
             Text("Voice")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
             Spacer()
             Picker("", selection: $appSettings.appleVoiceIdentifier) {
                 Text("System default").tag("")
@@ -772,8 +777,8 @@ struct CompanionPanelView: View {
     private var kokoroVoicePickerRow: some View {
         HStack {
             Text("Voice")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
             Spacer()
             Picker("", selection: $appSettings.kokoroVoice) {
                 ForEach(KokoroVoiceCatalog.availableVoices()) { voiceOption in
@@ -807,8 +812,8 @@ struct CompanionPanelView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
                 .pointerCursor()
             case .unavailable(let reason):
                 kokoroStatusText(reason)
@@ -819,8 +824,8 @@ struct CompanionPanelView: View {
 
     private func kokoroStatusText(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10))
-            .foregroundColor(DS.Colors.textTertiary)
+            .font(.skinFont(size: 10, design: skinTheme.fontDesign))
+            .foregroundColor(panelTextTertiaryColor)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -829,8 +834,8 @@ struct CompanionPanelView: View {
     private func settingsToggleRow(title: String, isOn: Binding<Bool>) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
             Spacer()
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
@@ -867,8 +872,8 @@ struct CompanionPanelView: View {
                     memoryManager.retryProvisioning()
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
                 .pointerCursor()
             }
             Spacer()
@@ -881,8 +886,8 @@ struct CompanionPanelView: View {
                 NSWorkspace.shared.open(memoryManager.memoryRootDirectoryURL)
             }
             .buttonStyle(.plain)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(DS.Colors.textSecondary)
+            .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+            .foregroundColor(panelTextSecondaryColor)
             .pointerCursor()
 
             Button("Forget today") {
@@ -891,8 +896,8 @@ struct CompanionPanelView: View {
                 }
             }
             .buttonStyle(.plain)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(DS.Colors.textSecondary)
+            .font(.skinFont(size: 10, weight: .semibold, design: skinTheme.fontDesign))
+            .foregroundColor(panelTextSecondaryColor)
             .pointerCursor()
 
             Spacer()
@@ -917,12 +922,12 @@ struct CompanionPanelView: View {
         )
         return HStack(spacing: 6) {
             Text("\(secretKey.displayName) key")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DS.Colors.textSecondary)
+                .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
+                .foregroundColor(panelTextSecondaryColor)
 
             if isSaved {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 10))
+                    .font(.skinFont(size: 10, design: skinTheme.fontDesign))
                     .foregroundColor(DS.Colors.success)
             }
 
@@ -937,13 +942,13 @@ struct CompanionPanelView: View {
                 saveAPIKey(secretKey)
             }) {
                 Text("Save")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(DS.Colors.textPrimary)
+                    .font(.skinFont(size: 11, weight: .semibold, design: skinTheme.fontDesign))
+                    .foregroundColor(panelTextPrimaryColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.white.opacity(0.1))
+                            .fill(panelControlFillColor)
                     )
             }
             .buttonStyle(.plain)
@@ -982,27 +987,27 @@ struct CompanionPanelView: View {
         }) {
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left.fill")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Got feedback? DM me")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.skinFont(size: 12, weight: .semibold, design: skinTheme.fontDesign))
                     Text("Bugs, ideas, anything — I read every message.")
-                        .font(.system(size: 10))
-                        .foregroundColor(DS.Colors.textTertiary)
+                        .font(.skinFont(size: 10, design: skinTheme.fontDesign))
+                        .foregroundColor(panelTextTertiaryColor)
                 }
             }
-            .foregroundColor(DS.Colors.textSecondary)
+            .foregroundColor(panelTextSecondaryColor)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(panelControlFillColor)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DS.CornerRadius.medium, style: .continuous)
-                    .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
+                    .stroke(panelBorderColor, lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -1018,11 +1023,11 @@ struct CompanionPanelView: View {
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "power")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                     Text("Quit Lumen")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
                 }
-                .foregroundColor(DS.Colors.textTertiary)
+                .foregroundColor(panelTextTertiaryColor)
             }
             .buttonStyle(.plain)
             .pointerCursor()
@@ -1035,11 +1040,11 @@ struct CompanionPanelView: View {
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "play.circle")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.skinFont(size: 11, weight: .medium, design: skinTheme.fontDesign))
                         Text("Watch Onboarding Again")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.skinFont(size: 12, weight: .medium, design: skinTheme.fontDesign))
                     }
-                    .foregroundColor(DS.Colors.textTertiary)
+                    .foregroundColor(panelTextTertiaryColor)
                 }
                 .buttonStyle(.plain)
                 .pointerCursor()
@@ -1050,23 +1055,33 @@ struct CompanionPanelView: View {
     // MARK: - Visual Helpers
 
     private var panelBackground: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(DS.Colors.background)
-            .shadow(color: Color.black.opacity(0.5), radius: 20, x: 0, y: 10)
-            .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+        SkinPanelBackground(theme: skinTheme)
     }
+
+    // MARK: - Skin Colours
+
+    /// The selected skin's tokens. Read from AppSettings, so switching skins
+    /// restyles the panel immediately.
+    private var skinTheme: SkinTheme { SkinTheme.theme(for: appSettings.selectedSkin) }
+    private var panelTextPrimaryColor: Color { Color(hex: skinTheme.panelTextPrimaryHex) }
+    private var panelTextSecondaryColor: Color { Color(hex: skinTheme.panelTextSecondaryHex) }
+    private var panelTextTertiaryColor: Color { Color(hex: skinTheme.panelTextTertiaryHex) }
+    private var panelBorderColor: Color { Color(hex: skinTheme.panelBorderHex) }
+    private var panelAccentColor: Color { Color(hex: skinTheme.panelAccentHex) }
+    private var panelOnAccentColor: Color { Color(hex: skinTheme.panelOnAccentHex) }
+    private var panelControlFillColor: Color { Color(hex: skinTheme.panelControlFillHex) }
 
     private var statusDotColor: Color {
         if !companionManager.isOverlayVisible {
-            return DS.Colors.textTertiary
+            return panelTextTertiaryColor
         }
         switch companionManager.voiceState {
         case .idle:
             return DS.Colors.success
         case .listening:
-            return DS.Colors.blue400
+            return panelAccentColor
         case .processing, .responding:
-            return DS.Colors.blue400
+            return panelAccentColor
         }
     }
 
