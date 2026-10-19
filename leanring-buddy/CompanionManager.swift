@@ -32,17 +32,17 @@ final class CompanionManager: ObservableObject {
 
     /// Screen location (global AppKit coords) of a detected UI element the
     /// buddy should fly to and point at. Parsed from Claude's response;
-    /// observed by BlueCursorView to trigger the flight animation.
+    /// observed by CompanionOverlayView to trigger the flight animation.
     @Published var detectedElementScreenLocation: CGPoint?
     /// The display frame (global AppKit coords) of the screen the detected
-    /// element is on, so BlueCursorView knows which screen overlay should animate.
+    /// element is on, so CompanionOverlayView knows which screen overlay should animate.
     @Published var detectedElementDisplayFrame: CGRect?
     /// The rect (global AppKit coords) the skin's pointing mark is drawn
     /// around: the Accessibility element under the point when one is found,
     /// otherwise a small box centred on it. Set before the location.
     @Published var detectedElementTargetRect: CGRect?
     /// Custom speech bubble text for the pointing animation. When set,
-    /// BlueCursorView uses this instead of a random pointer phrase.
+    /// CompanionOverlayView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
 
     // MARK: - Onboarding Video State (shared across all screen overlays)
@@ -220,7 +220,7 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// Called by BlueCursorView after the buddy finishes its pointing
+    /// Called by CompanionOverlayView after the buddy finishes its pointing
     /// animation and returns to cursor-following mode.
     /// Triggers the onboarding sequence — dismisses the panel and restarts
     /// the overlay so the welcome animation and intro video play.
@@ -932,7 +932,7 @@ final class CompanionManager: ObservableObject {
     // MARK: - Onboarding Video
 
     /// Sets up the onboarding video player, starts playback, and schedules
-    /// the demo interaction at 40s. Called by BlueCursorView when onboarding starts.
+    /// the demo interaction at 40s. Called by CompanionOverlayView when onboarding starts.
     func setupOnboardingVideo() {
         guard let videoURL = URL(string: "https://stream.mux.com/e5jB8UuSrtFABVnTHCR7k3sIsmcUHCyhtLu1tzqLlfs.m3u8") else { return }
 
