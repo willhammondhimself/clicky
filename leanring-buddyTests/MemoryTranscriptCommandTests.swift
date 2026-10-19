@@ -4,7 +4,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct MemoryTranscriptCommandTests {
@@ -36,9 +36,9 @@ struct MemoryTranscriptCommandTests {
         #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "remember this one?") == nil)
     }
 
-    @Test func allowsAHeyClickyPrefix() {
-        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "hey clicky, remember that I use zed") == "I use zed")
-        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "Clicky remember that I use zed") == "I use zed")
+    @Test func allowsAHeyLumenPrefix() {
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "hey lumen, remember that I use zed") == "I use zed")
+        #expect(MemoryTranscriptCommand.rememberedFact(fromTranscript: "Lumen remember that I use zed") == "I use zed")
     }
 
     @Test func rememberNotAtTheStartIsNotACommand() {

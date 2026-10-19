@@ -1,6 +1,6 @@
 // swift-tools-version: 6.2
 //
-// Terminal test harness for Clicky's pure-logic files. The app itself can
+// Terminal test harness for Lumen's pure-logic files. The app itself can
 // only be built from Xcode (running xcodebuild from the terminal resets the
 // app's TCC permissions), so files with no AppKit/FluidAudio dependency are
 // symlinked into this package and tested with `swift test`.
@@ -23,16 +23,16 @@ let mirroredTestTargetSettings: [SwiftSetting] = [
 ]
 
 let package = Package(
-    name: "ClickyLogic",
+    name: "LumenLogic",
     platforms: [.macOS(.v14)],
     targets: [
         .target(
-            name: "ClickyLogic",
+            name: "LumenLogic",
             swiftSettings: mirroredAppTargetSettings
         ),
         .testTarget(
-            name: "ClickyLogicTests",
-            dependencies: ["ClickyLogic"],
+            name: "LumenLogicTests",
+            dependencies: ["LumenLogic"],
             swiftSettings: mirroredTestTargetSettings
         ),
     ]

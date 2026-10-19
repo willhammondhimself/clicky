@@ -1,5 +1,5 @@
 //
-//  ClickyAnalytics.swift
+//  LumenAnalytics.swift
 //  leanring-buddy
 //
 //  Analytics are disabled in this fork. Upstream sent events to Farza's
@@ -10,7 +10,7 @@
 
 import Foundation
 
-enum ClickyAnalytics {
+enum LumenAnalytics {
 
     static func configure() {}
     static func trackAppOpened() {}

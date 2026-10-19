@@ -2,7 +2,7 @@
 //  AppSettings.swift
 //  leanring-buddy
 //
-//  User-facing configuration for which AI backends Clicky talks to. Backed by
+//  User-facing configuration for which AI backends Lumen talks to. Backed by
 //  UserDefaults; API keys are NOT stored here (see SecretsStore).
 //
 //  Defaults are chosen so a fresh install works with zero accounts:
@@ -179,7 +179,7 @@ final class AppSettings: ObservableObject {
         didSet { userDefaults.set(kokoroVoice, forKey: Keys.kokoroVoice) }
     }
 
-    /// Whether Clicky keeps a profile + daily notes on disk and injects them
+    /// Whether Lumen keeps a profile + daily notes on disk and injects them
     /// into the system prompt. See MemoryManager. On by default.
     @Published var isMemoryEnabled: Bool {
         didSet { userDefaults.set(isMemoryEnabled, forKey: Keys.isMemoryEnabled) }

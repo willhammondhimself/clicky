@@ -1,4 +1,4 @@
-# Clicky - Agent Instructions
+# Lumen - Agent Instructions
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
@@ -16,14 +16,14 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 - **Pattern**: MVVM with `@StateObject` / `@Published` state management
 - **AI Chat**: pluggable `ChatClient` — `OpenAICompatibleChatClient` (OpenRouter, Ollama, any `/chat/completions` server; default Ollama `gemma4:26b`) or `ClaudeAPI` (Anthropic Messages API direct). SSE streaming. Chosen in `AppSettings.chatProviderKind`.
 - **Speech-to-Text**: pluggable `BuddyTranscriptionProvider` — Apple Speech on-device (default), AssemblyAI real-time streaming (`u3-rt-pro`), or OpenAI upload. Chosen in `AppSettings.speechToTextProviderKind`.
-- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio Swift package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`. Kokoro models (~380 MB) download once from Hugging Face into `~/Library/Application Support/Clicky/Models` (plus ~40 MB of pronunciation assets in FluidAudio's own `~/.cache/fluidaudio`); `KokoroVoiceEngine` is a singleton so they load once per app run.
-- **Settings & Secrets**: `AppSettings` (UserDefaults-backed `ObservableObject`) for provider/model/voice choices; `SecretsStore` (Keychain, service `com.willhammond.clicky`) for API keys. `CompanionManager` observes `AppSettings` and rebuilds clients on change.
-- **Memory**: `MemoryManager` keeps `~/Library/Application Support/Clicky/Memory/PROFILE.md` (facts about the user, one `- ` bullet per line under `## ` headings) and `notes/YYYY-MM-DD.md` (one summarised line per exchange). The profile, today's note and the top-8 past note lines by embedding similarity (`embeddinggemma` via Ollama `/api/embed`, index in `notes/index.json`) are appended to the system prompt. The model writes facts with `[REMEMBER:Section:fact]` and removes them with `[FORGET:text]` tags (stripped before TTS by `MemoryTagParser`, which must run before the `[POINT]` parser); "remember that …" spoken at the start of a question is a fallback. Daily-note lines are summarised by `gemma4:e2b` (`/api/generate`, background) or written raw when it is unavailable. Both models are pulled from Ollama at launch when missing (`MemoryModelProvisioner`); until then the last two days are injected whole. On by default (`AppSettings.isMemoryEnabled`).
+- **Text-to-Speech**: pluggable `TTSClient` — `KokoroTTSClient` (on-device Kokoro-82M via the FluidAudio Swift package, default), `AppleSpeechTTSClient` (AVSpeechSynthesizer) or `ElevenLabsTTSClient` (`eleven_flash_v2_5`, direct). Chosen in `AppSettings.textToSpeechProviderKind`. Kokoro models (~380 MB) download once from Hugging Face into `~/Library/Application Support/Lumen/Models` (plus ~40 MB of pronunciation assets in FluidAudio's own `~/.cache/fluidaudio`); `KokoroVoiceEngine` is a singleton so they load once per app run.
+- **Settings & Secrets**: `AppSettings` (UserDefaults-backed `ObservableObject`) for provider/model/voice choices; `SecretsStore` (Keychain, service `com.willhammond.lumen`) for API keys. `CompanionManager` observes `AppSettings` and rebuilds clients on change.
+- **Memory**: `MemoryManager` keeps `~/Library/Application Support/Lumen/Memory/PROFILE.md` (facts about the user, one `- ` bullet per line under `## ` headings) and `notes/YYYY-MM-DD.md` (one summarised line per exchange). The profile, today's note and the top-8 past note lines by embedding similarity (`embeddinggemma` via Ollama `/api/embed`, index in `notes/index.json`) are appended to the system prompt. The model writes facts with `[REMEMBER:Section:fact]` and removes them with `[FORGET:text]` tags (stripped before TTS by `MemoryTagParser`, which must run before the `[POINT]` parser); "remember that …" spoken at the start of a question is a fallback. Daily-note lines are summarised by `gemma4:e2b` (`/api/generate`, background) or written raw when it is unavailable. Both models are pulled from Ollama at launch when missing (`MemoryModelProvisioner`); until then the last two days are injected whole. On by default (`AppSettings.isMemoryEnabled`).
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
 - **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the blue cursor along a bezier arc to the target.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
-- **Analytics**: none. `ClickyAnalytics.swift` is a no-op stub kept so call sites compile.
+- **Analytics**: none. `LumenAnalytics.swift` is a no-op stub kept so call sites compile.
 - **Networking**: `Info.plist` sets `NSAllowsLocalNetworking` so the app can reach `http://localhost:11434` (Ollama) despite App Transport Security.
 
 ### Key Architecture Decisions
@@ -36,7 +36,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 
 **Shared URLSession for AssemblyAI**: A single long-lived `URLSession` is shared across all AssemblyAI streaming sessions (owned by the provider, not the session). Creating and invalidating a URLSession per session corrupts the OS connection pool and causes "Socket is not connected" errors after a few rapid reconnections.
 
-**Transient Cursor Mode**: When "Show Clicky" is off, pressing the hotkey fades in the cursor overlay for the duration of the interaction (recording → response → TTS → optional pointing), then fades it out automatically after 1 second of inactivity.
+**Transient Cursor Mode**: When "Show Lumen" is off, pressing the hotkey fades in the cursor overlay for the duration of the interaction (recording → response → TTS → optional pointing), then fades it out automatically after 1 second of inactivity.
 
 ## Key Files
 
@@ -61,6 +61,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 | `SentenceSplitter.swift` | ~140 | Pure sentence chunker for TTS (merge pieces under 20 chars, split over 300 at a comma). Unit-tested. |
 | `KokoroVoiceCatalog.swift` | ~80 | The 28 American/British Kokoro voice codes with readable labels; default `bm_george`. Unit-tested. |
 | `KokoroOperatingSystemSupport.swift` | ~35 | Blocks Kokoro on macOS 26.4–26.5 (Apple BNNS crash bug, fixed in 26.6); v3 runtime availability. Unit-tested. |
+| `ApplicationSupportFolderMigration.swift` | ~60 | One-time move of `~/Library/Application Support/Clicky` to `.../Lumen` (memory + Kokoro models) after the rename. `currentFolderURL` runs it on first access, so storage paths always resolve after the move. Unit-tested. |
 | `MemoryManager.swift` | ~515 | `@MainActor` singleton glue for memory: `prepareAtLaunch`, `memoryPromptBlock(forQuestion:)` (retrieval with a 5 s timeout → last-two-days fallback), `applyMemoryTags`, `recordExchange` (background summary + index), `forgetToday`. Catches every error; nothing throws into the reply pipeline. Talks to Ollama at the settings URL when Ollama is the chat provider, else the default local URL. |
 | `MemoryStore.swift` | ~145 | `actor` doing all memory file I/O under an injected root (profile read/write, note append/read/list/delete, index read/write). Unit-tested against a temp dir. |
 | `MemoryTagParser.swift` | ~100 | Strips `[REMEMBER:Section:fact]` / `[FORGET:text]` anywhere in a reply (case-insensitive, unterminated tag cut to end). Runs before `parsePointingCoordinates`. Unit-tested. |
@@ -91,7 +92,7 @@ This fork calls provider APIs directly. API keys are stored in the macOS Keychai
 | `ElevenLabsTTSClient.swift` | ~95 | ElevenLabs TTS client (direct, `xi-api-key` from Keychain). Conforms to `TTSClient`. Plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
 | `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
 | `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
-| `ClickyAnalytics.swift` | ~30 | No-op stub. Upstream's PostHog integration was removed; method names kept so call sites compile. |
+| `LumenAnalytics.swift` | ~30 | No-op stub. Upstream's PostHog integration was removed; method names kept so call sites compile. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
 
@@ -127,7 +128,7 @@ Pure-logic files (no AppKit/FluidAudio imports) are symlinked into a small Swift
 cd tools/logic-tests && swift test
 ```
 
-After adding a new symlink, delete `tools/logic-tests/.build` once — SwiftPM caches the source list. Test files live in `leanring-buddyTests/` and import the module conditionally (`leanring_buddy` in Xcode, `ClickyLogic` in the harness), so Cmd+U runs the same tests.
+After adding a new symlink, delete `tools/logic-tests/.build` once — SwiftPM caches the source list. Test files live in `leanring-buddyTests/` and import the module conditionally (`leanring_buddy` in Xcode, `LumenLogic` in the harness), so Cmd+U runs the same tests.
 
 ## Xcode MCP
 

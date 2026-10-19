@@ -3,7 +3,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct KokoroVoiceCatalogTests {

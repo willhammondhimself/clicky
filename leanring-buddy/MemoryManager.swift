@@ -276,7 +276,7 @@ final class MemoryManager: ObservableObject {
     }
 
     /// Removes the profile line most similar to `forgetText` and returns what
-    /// Clicky should say about it.
+    /// Lumen should say about it.
     private func forgetProfileLine(matching forgetText: String) async -> String {
         do {
             let profileMarkdown = try await memoryStore.readProfileMarkdown()
@@ -293,7 +293,7 @@ final class MemoryManager: ObservableObject {
             let now = Date()
             let paperTrailEntry = DailyNoteEntry(
                 time: DailyNoteLineFormat.timeString(for: now, calendar: calendar),
-                applicationName: "Clicky",
+                applicationName: "Lumen",
                 summary: "forgot: " + matchedLine.replacingOccurrences(of: "·", with: "-")
             )
             try? await memoryStore.appendDailyNoteLine(

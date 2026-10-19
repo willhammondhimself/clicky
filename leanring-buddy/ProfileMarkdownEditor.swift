@@ -10,7 +10,7 @@
 
 import Foundation
 
-/// The headings Clicky knows. The model names one in its [REMEMBER] tag;
+/// The headings Lumen knows. The model names one in its [REMEMBER] tag;
 /// anything it invents lands in Notes so no fact is lost.
 nonisolated enum ProfileSection: String, CaseIterable, Sendable {
     case aboutMe = "About me"
@@ -41,7 +41,7 @@ nonisolated enum ProfileMarkdownEditor {
 
     static func starterMarkdown() -> String {
         """
-        <!-- clicky reads this file before every reply. one fact per line, as a "- " bullet under a heading. edit it freely; clicky adds lines when you say "remember that…" and removes them when you say "forget…". -->
+        <!-- lumen reads this file before every reply. one fact per line, as a "- " bullet under a heading. edit it freely; lumen adds lines when you say "remember that…" and removes them when you say "forget…". -->
 
         # Profile
 
@@ -50,7 +50,7 @@ nonisolated enum ProfileMarkdownEditor {
         - builds his own tools; wants a local-first, always-on JARVIS-style assistant (this app)
 
         ## Projects
-        - Clicky: this macOS screen-aware voice assistant, forked from farzaa/clicky, Swift/SwiftUI
+        - Lumen: this macOS screen-aware voice assistant, forked from farzaa/clicky, Swift/SwiftUI
         - Market Population Dynamics: agent-based market simulation research (paused), advisor Alan Kahn
         - Haven: iOS care companion app for an elderly user and a caretaker
         - Lucid: lucid-dream training iOS app using Apple Watch / Oura sleep data

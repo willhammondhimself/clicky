@@ -2,7 +2,7 @@
 //  KokoroVoiceCatalog.swift
 //  leanring-buddy
 //
-//  The Kokoro voices Clicky offers in the voice picker, with readable
+//  The Kokoro voices Lumen offers in the voice picker, with readable
 //  labels. Voice codes follow Kokoro's convention: first letter is the
 //  accent (a = American, b = British), second is the gender (f/m), then the
 //  name. The list is the English subset of FluidAudio's

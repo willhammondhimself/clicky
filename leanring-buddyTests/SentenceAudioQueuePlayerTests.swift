@@ -4,7 +4,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 /// The player is main-actor isolated and the Xcode test target has no

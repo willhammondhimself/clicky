@@ -4,7 +4,7 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 /// Fake Ollama: a fixed set of installed models, a list that may fail, pulls

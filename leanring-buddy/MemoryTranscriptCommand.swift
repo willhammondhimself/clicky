@@ -16,7 +16,7 @@ nonisolated enum MemoryTranscriptCommand {
     /// ("remember what I was doing?") and would be stored as a fact. "to" is
     /// kept in the fact because "remember to ship friday" reads correctly.
     private static let rememberCommandRegex = try! NSRegularExpression(
-        pattern: #"^\s*(?:(?:hey|ok|okay)?\s*clicky\s*[,:]?\s*)?remember\s+(?:(?:that|this)\b\s*[,:]?\s*(.*)|(to\b.*))$"#,
+        pattern: #"^\s*(?:(?:hey|ok|okay)?\s*lumen\s*[,:]?\s*)?remember\s+(?:(?:that|this)\b\s*[,:]?\s*(.*)|(to\b.*))$"#,
         options: [.caseInsensitive, .dotMatchesLineSeparators]
     )
 

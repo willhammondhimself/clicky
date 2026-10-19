@@ -32,7 +32,7 @@ enum SecretsStore {
     }
 
     /// Keychain service name shared by every item this app stores.
-    private static let keychainServiceName = "com.willhammond.clicky"
+    private static let keychainServiceName = "com.willhammond.lumen"
 
     /// Returns the stored key, or nil when nothing is saved for it.
     static func read(_ key: Key) -> String? {

@@ -5,7 +5,7 @@
 //  Which macOS builds can run Kokoro safely. FluidAudio's own notes
 //  (KokoroAneManager.osAdvisory) record an Apple BNNS bug on macOS 26.4 and
 //  26.5 that crashes synthesis in-process with EXC_BAD_ACCESS — not something
-//  a catch block can handle — and that 26.6 fixes it. On those builds Clicky
+//  a catch block can handle — and that 26.6 fixes it. On those builds Lumen
 //  refuses to load Kokoro and speaks with the Apple voice instead.
 //
 

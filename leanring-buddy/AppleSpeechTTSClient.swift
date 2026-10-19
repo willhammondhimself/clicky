@@ -3,7 +3,7 @@
 //  leanring-buddy
 //
 //  On-device text-to-speech via AVSpeechSynthesizer. Free, offline, and the
-//  default so Clicky talks on a fresh install with no accounts. Quality
+//  default so Lumen talks on a fresh install with no accounts. Quality
 //  depends on which voice is installed — download an "Enhanced" or
 //  "Premium" voice in System Settings → Accessibility → Spoken Content.
 //

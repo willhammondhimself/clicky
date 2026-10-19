@@ -1,20 +1,20 @@
-# Clicky (Will's fork)
+# Lumen
 
-A fork of [farzaa/clicky](https://github.com/farzaa/clicky) — the MIT-licensed April 2026 prototype of what became [HeyClicky](https://www.heyclicky.com/). Hold a hotkey, ask a question out loud, and an AI buddy that can see your screen answers by voice and flies a little cursor to the button it's talking about.
+Hold a hotkey, ask a question out loud, and a voice assistant that can see your screen answers by voice and points at the button it's talking about. It runs on your Mac, defaults to fully local models, and remembers you between sessions.
 
-![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
+Lumen started as a fork of [farzaa/clicky](https://github.com/farzaa/clicky), the MIT-licensed April 2026 prototype of what became [HeyClicky](https://www.heyclicky.com/), and has since been renamed and redesigned. The original copyright notice stays in `LICENSE`.
 
-## What's different in this fork
+## What's different from upstream
 
-Upstream routed every API call through a Cloudflare Worker that held the keys. This fork:
+Upstream routed every API call through a Cloudflare Worker that held the keys. Lumen:
 
 - **Calls providers directly.** No Worker, no Cloudflare account. API keys go in the in-app **AI Settings** panel and are stored in the macOS Keychain.
 - **Is provider-agnostic.** The chat model can be any OpenAI-compatible endpoint (OpenRouter, Ollama, LM Studio, vLLM…) or Anthropic directly. One OpenRouter key reaches Haiku 5.5, DeepSeek, GLM, Qwen-VL, Gemini, etc.
 - **Runs fully offline by default.** Fresh install = Apple Speech (STT) → Ollama on localhost (vision LLM) → Kokoro (local neural TTS, one-time ~380 MB model download). Zero accounts needed. AssemblyAI and ElevenLabs are opt-in toggles.
 - **Phones home to nobody.** Upstream's PostHog telemetry, FormSpark email capture and Sparkle update feed are removed.
-- **Remembers you.** A plain-Markdown profile (`PROFILE.md`) plus a daily note per day live in `~/Library/Application Support/Clicky/Memory/` and are fed to the model with every question (past days by embedding search). Say "remember that …" or let the model save facts itself; "forget …" removes them. Two small Ollama models (`embeddinggemma`, `gemma4:e2b`, ~5 GB) download once at launch. Everything you say after "remember that" is stored verbatim, and each question and answer is summarised into the day's note, so don't dictate secrets. Toggle it off in AI Settings → Memory.
+- **Remembers you.** A plain-Markdown profile (`PROFILE.md`) plus a daily note per day live in `~/Library/Application Support/Lumen/Memory/` and are fed to the model with every question (past days by embedding search). Say "remember that …" or let the model save facts itself; "forget …" removes them. Two small Ollama models (`embeddinggemma`, `gemma4:e2b`, ~5 GB) download once at launch. Everything you say after "remember that" is stored verbatim, and each question and answer is summarised into the day's note, so don't dictate secrets. Toggle it off in AI Settings → Memory.
 
-Everything else — the overlay, pointing animation, screen capture, push-to-talk — is Farza's code.
+The overlay mechanics, screen capture and push-to-talk pipeline are still based on Farza's code.
 
 ## Setup
 
@@ -43,7 +43,7 @@ Do not build with `xcodebuild` from the terminal — it invalidates the TCC perm
    - **Text to speech** — Kokoro (local) by default: a British male voice out of the box, 28 voices in the menu, models download once from Hugging Face on first use (the status line under the Voice menu shows progress). Apple voices need no download (pick an *Enhanced*/*Premium* voice in System Settings → Accessibility → Spoken Content for best results). ElevenLabs needs a key.
 3. Hold **Control + Option**, ask something about your screen, release.
 
-Keys are read from the Keychain (service `com.willhammond.clicky`). `.env.example` documents them but is never read by the app.
+Keys are read from the Keychain (service `com.willhammond.lumen`). `.env.example` documents them but is never read by the app.
 
 ## Architecture
 
@@ -65,7 +65,7 @@ leanring-buddy/
   KokoroVoiceCatalog.swift          # voice codes + labels (unit-tested)
   AppleSpeechTTSClient.swift        # AVSpeechSynthesizer (zero-download fallback)
   MemoryManager.swift               # profile + daily notes → system prompt; [REMEMBER]/[FORGET] tags
-  MemoryStore.swift                 # file I/O under Application Support/Clicky/Memory
+  MemoryStore.swift                 # file I/O under Application Support/Lumen/Memory
   MemoryIndex.swift                 # embedding index + cosine search (unit-tested)
   ElevenLabsTTSClient.swift         # ElevenLabs (direct)
   BuddyTranscriptionProvider.swift  # STT protocol + factory (Apple / AssemblyAI / OpenAI)

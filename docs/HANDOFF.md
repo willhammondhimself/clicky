@@ -1,16 +1,23 @@
 # HANDOFF — read this first after a context reset
 
-Last updated: 2026-10-18. Branch `feature/direct-providers` (Kokoro and memory are both merged into it; memory landed via PR #1 on 2026-10-18). Start the next feature on a new `feature/...` branch off it. Kokoro work: `docs/superpowers/plans/2026-10-14-kokoro-tts.md`; memory work: `docs/superpowers/plans/2026-10-17-memory.md` (decisions + architecture).
+Last updated: 2026-10-19. Branch `feature/lumen-rename` (off `feature/direct-providers`, where Kokoro and memory are merged; memory landed via PR #1 on 2026-10-18). The app is being renamed from Clicky to **Lumen** and redesigned (see below). Kokoro work: `docs/superpowers/plans/2026-10-14-kokoro-tts.md`; memory work: `docs/superpowers/plans/2026-10-17-memory.md` (decisions + architecture).
 
 ## Where we are
 
 The fork builds and the core loop works end to end, fully offline, on Will's M4 Pro (48 GB):
 hold Ctrl+Option → Apple Speech (on-device) → screenshot → `gemma4:26b` on Ollama → **Kokoro** British male voice (on-device) + cursor flies to the right element. Will verified all of that in the real app on 2026-10-15.
 
+**Rename to Lumen (2026-10-19, in progress on `feature/lumen-rename`):**
+- Full rename, chosen by Will: display name, `PRODUCT_NAME`, bundle id `com.willhammond.lumen` (tests `…lumenTests`), Keychain service `com.willhammond.lumen`, log prefixes, prompts, Swift identifiers (`LumenAnalytics`, `isLumenCursorEnabled`, `.lumenDismissPanel`), harness module `LumenLogic`. Kept on purpose: the `leanring-buddy` directory, scheme and Swift module name (`PRODUCT_MODULE_NAME = leanring_buddy` is now explicit), the GitHub repo and `~/code/clicky` directory names, the upstream credit in README/LICENSE, and the old plans/specs (historical).
+- **Consequences for Will on first Cmd+R:** macOS sees a new app, so re-grant Microphone, Accessibility, Screen Recording and Screen Content; re-enter API keys (the Keychain service changed); UserDefaults start fresh (provider, voice and model fall back to the local defaults). Remove the old Clicky entry from System Settings → General → Login Items, and quit any running Clicky (`pgrep -fl Clicky.app`).
+- `ApplicationSupportFolderMigration` moves `~/Library/Application Support/Clicky` to `.../Lumen` on first access of either storage path, so memory notes and the Kokoro models survive. If both folders exist nothing is moved. Existing `PROFILE.md` text still says "clicky"; edit by hand.
+- `TEST_HOST` in the test targets pointed at a non-existent `leanring-buddy.app` while the product was named Clicky; it now points at `Lumen.app`. Unverified until Will runs Cmd+U.
+- Visual redesign is a separate step: look board at the published artifact "Lumen look board", four directions (A Ember, B Instrument, C Marginalia, D Aperture). The blue cursor, menu bar triangle, panel palette and app icon are still upstream's until Will picks.
+
 **Memory (2026-10-17, implemented, not yet run by Will):**
-- `~/Library/Application Support/Clicky/Memory/PROFILE.md` (starter prefilled about Will; `- ` bullets under `## About me / Projects / Tools / Preferences / Notes`) and `notes/YYYY-MM-DD.md` (`HH:MM · App · summary` lines) plus `notes/index.json` (embeddings).
+- `~/Library/Application Support/Lumen/Memory/PROFILE.md` (starter prefilled about Will; `- ` bullets under `## About me / Projects / Tools / Preferences / Notes`) and `notes/YYYY-MM-DD.md` (`HH:MM · App · summary` lines) plus `notes/index.json` (embeddings).
 - Every question: profile whole + today's note whole + top-8 past lines by `embeddinggemma` cosine (≥ 0.3; calibrated 2026-10-17 — relevant lines score ≈0.45–0.5, unrelated ≤0.2, with the EmbeddingGemma task prefixes) appended to the system prompt (8,000-char cap). Falls back to profile + yesterday whole when the models aren't ready or Ollama is down (5 s retrieval timeout).
-- Writes: model emits `[REMEMBER:Section:fact]` / `[FORGET:text]` (stripped before TTS; `MemoryTagParser` runs before the POINT parser). "remember that …" at the start of a question is the fallback. FORGET removes the closest profile line (embedding ≥ 0.4 — paraphrases score 0.45–0.6, absent facts ≤ 0.25 — else substring) and Clicky says "forgot: …"; a `forgot:` paper-trail line goes to today's note.
+- Writes: model emits `[REMEMBER:Section:fact]` / `[FORGET:text]` (stripped before TTS; `MemoryTagParser` runs before the POINT parser). "remember that …" at the start of a question is the fallback. FORGET removes the closest profile line (embedding ≥ 0.4 — paraphrases score 0.45–0.6, absent facts ≤ 0.25 — else substring) and Lumen says "forgot: …"; a `forgot:` paper-trail line goes to today's note.
 - After each reply, `gemma4:e2b` summarises the exchange into one note line in the background (raw `question → first sentence` when unavailable), then the new line is embedded.
 - Both models are pulled from Ollama at launch when missing (status row under AI Settings → Memory, Retry on failure). Memory always talks to Ollama even when chat is on a cloud provider (settings URL when provider is Ollama, else `http://127.0.0.1:11434`).
 - Panel: "Remember things" toggle (default on), status row with profile fact count, "Open memory folder", "Forget today".
@@ -50,7 +57,7 @@ All in the panel's **AI Settings**, persisted in UserDefaults via `AppSettings`;
 - STT: `SpeechToTextProviderKind` = apple (default) | assemblyAI | openAI
 - TTS: `TextToSpeechProviderKind` = kokoro (default) | apple | elevenLabs; Kokoro voice picker (28 voices, default `bm_george`) with model-status row; Apple voice picker; ElevenLabs voice ID
 
-Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB after first run); FluidAudio keeps its English pronunciation assets (~40 MB) in `~/.cache/fluidaudio/Models/kokoro` regardless of the directory setting. Delete both to re-test the cold path.
+Kokoro models live in `~/Library/Application Support/Lumen/Models` (~380 MB after first run); FluidAudio keeps its English pronunciation assets (~40 MB) in `~/.cache/fluidaudio/Models/kokoro` regardless of the directory setting. Delete both to re-test the cold path.
 
 ## Conventions that bite
 
@@ -58,7 +65,7 @@ Kokoro models live in `~/Library/Application Support/Clicky/Models` (~380 MB aft
 - **Terminal tests:** `cd tools/logic-tests && swift test`. After adding a new symlink, delete `tools/logic-tests/.build` once (SwiftPM caches the source list).
 - **Timing-sensitive test:** `KokoroTTSClientTests.aCancelledReplyDoesNotMarkTheNextReplyAsFinished` waits fixed 60 ms sleeps for real `AVAudioEngine` playback to finish; it passed twice on 2026-10-17 and failed consistently on 2026-10-18 (same on the base branch, load average ≈5). Not a memory-branch regression. Fix candidate: poll `isPlaying` with a deadline instead of fixed sleeps, as `MemoryModelProvisionerTests.waitUntil` does.
 - **Reading Xcode output without copy-paste:** build logs are `~/Library/Developer/Xcode/DerivedData/leanring-buddy-*/Logs/Build/*.xcactivitylog` (gzip); the console of a *finished* run is in `Logs/Launch/Run-*.xcresult` via `xcrun xcresulttool get log --path <xcresult> --type console`. Xcode's MCP server (`xcrun mcpbridge`) is registered for Claude Code at user scope; Will still needs to enable it in Xcode → Settings → Intelligence, then it can build/test/read issues through Xcode.
-- **Stray instances:** the app registers itself as a login item (`registerAsLoginItemIfNeeded`), and an instance from an earlier Xcode run kept running for hours alongside the new one — both answer the hotkey, so you hear two replies (the old one spoke an "i couldn't reach the model" error). Check `pgrep -fl Clicky.app` when behaviour looks doubled.
+- **Stray instances:** the app registers itself as a login item (`registerAsLoginItemIfNeeded`), and an instance from an earlier Xcode run kept running for hours alongside the new one — both answer the hotkey, so you hear two replies (the old one spoke an "i couldn't reach the model" error). Check `pgrep -fl Lumen.app` when behaviour looks doubled.
 - Xcode project uses **synchronized folders**: new `.swift` files in `leanring-buddy/` are picked up automatically; no pbxproj edits.
 - SourceKit per-file "cannot find type" diagnostics are noise (no module context). Trust the typecheck script.
 - Don't rename the `leanring-buddy` dir/scheme. Don't fix upstream's known Swift-6 warnings.

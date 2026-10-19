@@ -4,14 +4,14 @@ import Testing
 #if canImport(leanring_buddy)
 @testable import leanring_buddy
 #else
-@testable import ClickyLogic
+@testable import LumenLogic
 #endif
 
 struct MemoryStoreTests {
 
     private func makeStore() -> MemoryStore {
         let rootDirectoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("clicky-memory-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("lumen-memory-tests-\(UUID().uuidString)", isDirectory: true)
         return MemoryStore(rootDirectoryURL: rootDirectoryURL)
     }
 

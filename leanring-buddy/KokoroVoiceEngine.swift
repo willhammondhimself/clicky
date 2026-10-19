@@ -38,9 +38,8 @@ final class KokoroVoiceEngine: ObservableObject, KokoroSentenceSynthesizing {
     /// The CoreML models and voice packs. FluidAudio keeps its English
     /// pronunciation assets (BART G2P + lexicon, ~40 MB) in its own default
     /// cache regardless of this setting.
-    static let modelsDirectory: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Clicky/Models", isDirectory: true)
+    static let modelsDirectory: URL = ApplicationSupportFolderMigration.currentFolderURL
+        .appendingPathComponent("Models", isDirectory: true)
 
     @Published private(set) var loadState: KokoroModelLoadState = .notLoaded
 

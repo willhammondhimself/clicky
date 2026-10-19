@@ -4,7 +4,7 @@
 //
 //  All file I/O for the memory folder:
 //
-//      ~/Library/Application Support/Clicky/Memory/
+//      ~/Library/Application Support/Lumen/Memory/
 //        PROFILE.md
 //        notes/YYYY-MM-DD.md
 //        notes/index.json
@@ -18,9 +18,8 @@
 import Foundation
 
 actor MemoryStore {
-    static let defaultRootDirectoryURL: URL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Clicky/Memory", isDirectory: true)
+    static let defaultRootDirectoryURL: URL = ApplicationSupportFolderMigration.currentFolderURL
+        .appendingPathComponent("Memory", isDirectory: true)
 
     static let indexFileName = "index.json"
 
