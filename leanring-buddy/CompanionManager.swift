@@ -612,6 +612,8 @@ final class CompanionManager: ObservableObject {
                 // Write remembered facts / forget lines now; a [FORGET] adds
                 // "forgot: …" to what gets spoken.
                 let memoryWriteOutcome = await memoryManager.applyMemoryTags(memoryTagParseResult, transcript: transcript)
+                // The user may have pressed the hotkey again during that await.
+                try Task.checkCancellation()
                 if let spokenConfirmation = memoryWriteOutcome.spokenConfirmation {
                     spokenText = spokenText.isEmpty ? spokenConfirmation : spokenText + " " + spokenConfirmation
                 }
@@ -665,6 +667,9 @@ final class CompanionManager: ObservableObject {
                         atAppKitGlobalPoint: globalLocation,
                         displayFrame: displayFrame
                     )
+                    // A new push-to-talk cancels this task and clears the
+                    // pointing state; never publish a stale target after that.
+                    try Task.checkCancellation()
                     detectedElementTargetRect = targetRectResolution.rectInAppKitGlobal
                     detectedElementBubbleText = PointingBubbleText.bubbleText(
                         elementLabel: parseResult.elementLabel,
@@ -724,6 +729,15 @@ final class CompanionManager: ObservableObject {
                     spokenReply: spokenText,
                     frontmostApplicationName: frontmostApplicationName
                 )
+
+                // speakText returned when audio started; stay in the speaking
+                // state (the companion's speaking animation) until the reply
+                // has actually finished playing.
+                if voiceState == .responding {
+                    try await SpeechPlaybackWaiter.waitUntilPlaybackEnds {
+                        self.textToSpeechClient.isPlaying
+                    }
+                }
             } catch is CancellationError {
                 // User spoke again — response was interrupted
             } catch {

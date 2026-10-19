@@ -222,7 +222,11 @@ struct CompanionOverlayView: View {
                     )
                     .scaleEffect(navigationBubbleScale)
                     .opacity(navigationBubbleOpacity)
-                    .position(x: cursorPosition.x + 10 + (navigationBubbleSize.width / 2), y: cursorPosition.y + 18)
+                    .position(PointingGeometry.pointingBubbleCenter(
+                        companionPoint: cursorPosition,
+                        bubbleSize: navigationBubbleSize,
+                        targetRectInOverlay: pointingTargetRectInOverlay
+                    ))
                     .animation(.spring(response: 0.2, dampingFraction: 0.6, blendDuration: 0), value: cursorPosition)
                     .animation(.spring(response: 0.4, dampingFraction: 0.6), value: navigationBubbleScale)
                     .animation(.easeOut(duration: 0.5), value: navigationBubbleOpacity)
@@ -240,7 +244,8 @@ struct CompanionOverlayView: View {
             SkinCompanionView(
                 skin: appSettings.selectedSkin,
                 visualState: companionVisualState,
-                microphoneAudioPowerLevel: companionManager.currentAudioPowerLevel
+                microphoneAudioPowerLevel: companionManager.currentAudioPowerLevel,
+                isVisible: buddyIsVisibleOnThisScreen && cursorOpacity > 0
             )
             .scaleEffect(buddyFlightScale)
             .opacity(buddyIsVisibleOnThisScreen ? cursorOpacity : 0)

@@ -38,6 +38,13 @@ struct LumenSkinTests {
         }
     }
 
+    @Test func lightPanelSkinsAreInstrumentAndMarginalia() {
+        // System controls in the panel must match the card, not macOS dark mode.
+        #expect(!SkinTheme.theme(for: .ember).isLightPanel)
+        #expect(SkinTheme.theme(for: .instrument).isLightPanel)
+        #expect(SkinTheme.theme(for: .marginalia).isLightPanel)
+    }
+
     @Test func skinCharacterTokens() {
         let ember = SkinTheme.theme(for: .ember)
         #expect(ember.fontDesign == .rounded)

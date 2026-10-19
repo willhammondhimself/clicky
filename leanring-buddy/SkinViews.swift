@@ -52,13 +52,20 @@ struct SkinCompanionView: View {
     let skin: LumenSkin
     let visualState: CompanionVisualState
     let microphoneAudioPowerLevel: CGFloat
+    /// False on screens where the companion is hidden: the animation clock
+    /// pauses there so idle overlays cost nothing.
+    let isVisible: Bool
 
     static let frameSide: CGFloat = 60
 
     var body: some View {
         let theme = SkinTheme.theme(for: skin)
-        TimelineView(.animation(minimumInterval: nil, paused: SkinMotion.shouldReduceMotion)) { timelineContext in
-            let animationTime = SkinMotion.shouldReduceMotion ? 0 : timelineContext.date.timeIntervalSinceReferenceDate
+        let shouldReduceMotion = SkinMotion.shouldReduceMotion
+        // Idle motion is slow (multi-second breathe/wobble), so 30 fps is
+        // plenty; listening, thinking, speaking and flying run at full rate.
+        let minimumFrameInterval: Double? = visualState == .idle ? 1.0 / 30.0 : nil
+        TimelineView(.animation(minimumInterval: minimumFrameInterval, paused: shouldReduceMotion || !isVisible)) { timelineContext in
+            let animationTime = shouldReduceMotion ? 0 : timelineContext.date.timeIntervalSinceReferenceDate
             Group {
                 switch skin {
                 case .ember:

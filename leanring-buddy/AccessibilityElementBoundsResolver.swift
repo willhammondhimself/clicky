@@ -9,7 +9,7 @@
 //  Accessibility calls are synchronous IPC into the target app, so they run
 //  off the main actor with a short messaging timeout: a hung app costs at most
 //  ~150 ms per call instead of the ~6 s default, and the overlay's animation
-//  timers never stall. Lumen already holds the Accessibility permission (the
+//  timers never stall; the whole lookup is capped at 400 ms. Lumen already holds the Accessibility permission (the
 //  push-to-talk shortcut needs it), so this asks for nothing new.
 //
 
@@ -19,6 +19,9 @@ import ApplicationServices
 nonisolated enum AccessibilityElementBoundsResolver {
     private static let messagingTimeoutSeconds: Float = 0.15
     private static let maximumAncestorCount = 6
+    /// Cap on the whole lookup (window list, hit test and ancestor walk), so a
+    /// slow app delays the spoken reply by at most this much.
+    private static let maximumLookupDuration: Duration = .milliseconds(400)
 
     @MainActor
     static func resolveTargetRect(atAppKitGlobalPoint appKitGlobalPoint: CGPoint, displayFrame: CGRect) async -> TargetRectResolution {
@@ -30,7 +33,11 @@ nonisolated enum AccessibilityElementBoundsResolver {
         let ownProcessIdentifier = getpid()
 
         let candidatesFromHitUpward = await Task.detached(priority: .userInitiated) {
-            collectCandidates(atAppKitGlobalPoint: appKitGlobalPoint, primaryScreenHeight: primaryScreenHeight)
+            collectCandidates(
+                atAppKitGlobalPoint: appKitGlobalPoint,
+                primaryScreenHeight: primaryScreenHeight,
+                ownProcessIdentifier: ownProcessIdentifier
+            )
         }.value
 
         return ElementBoundsSelection.resolve(
@@ -42,23 +49,38 @@ nonisolated enum AccessibilityElementBoundsResolver {
     }
 
     /// The element under the point followed by up to `maximumAncestorCount`
-    /// parents. Any Accessibility error ends the walk; an error on the hit
+    /// parents. The hit test runs against the app that owns the topmost
+    /// window under the point (never Lumen's own overlay, which covers every
+    /// screen). Any Accessibility error ends the walk; an error on the hit
     /// itself returns an empty list, which ElementBoundsSelection treats as a
-    /// miss.
-    private static func collectCandidates(atAppKitGlobalPoint appKitGlobalPoint: CGPoint, primaryScreenHeight: CGFloat) -> [AccessibilityElementCandidate] {
+    /// miss. The whole lookup stops at `maximumLookupDuration`.
+    private static func collectCandidates(
+        atAppKitGlobalPoint appKitGlobalPoint: CGPoint,
+        primaryScreenHeight: CGFloat,
+        ownProcessIdentifier: Int32
+    ) -> [AccessibilityElementCandidate] {
+        let clock = ContinuousClock()
+        let deadline = clock.now + maximumLookupDuration
         let accessibilityPoint = PointingGeometry.accessibilityPoint(
             fromAppKitGlobalPoint: appKitGlobalPoint,
             primaryScreenHeight: primaryScreenHeight
         )
 
-        let systemWideElement = AXUIElementCreateSystemWide()
+        guard let targetProcessIdentifier = WindowUnderPointSelection.processIdentifierOfTopmostWindow(
+            atAccessibilityPoint: accessibilityPoint,
+            windowsFrontToBack: onScreenWindowsFrontToBack(),
+            ownProcessIdentifier: ownProcessIdentifier
+        ) else { return [] }
+
         // Setting the timeout on the system-wide element applies it to every
-        // element queried below.
-        AXUIElementSetMessagingTimeout(systemWideElement, messagingTimeoutSeconds)
+        // element queried below; set it on the app element too to be explicit.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), messagingTimeoutSeconds)
+        let applicationElement = AXUIElementCreateApplication(targetProcessIdentifier)
+        AXUIElementSetMessagingTimeout(applicationElement, messagingTimeoutSeconds)
 
         var hitElement: AXUIElement?
         let hitResult = AXUIElementCopyElementAtPosition(
-            systemWideElement,
+            applicationElement,
             Float(accessibilityPoint.x),
             Float(accessibilityPoint.y),
             &hitElement
@@ -67,7 +89,8 @@ nonisolated enum AccessibilityElementBoundsResolver {
 
         var candidatesFromHitUpward: [AccessibilityElementCandidate] = []
         for _ in 0...maximumAncestorCount {
-            guard let candidate = makeCandidate(from: currentElement, primaryScreenHeight: primaryScreenHeight) else { break }
+            guard clock.now < deadline,
+                  let candidate = makeCandidate(from: currentElement, primaryScreenHeight: primaryScreenHeight) else { break }
             candidatesFromHitUpward.append(candidate)
 
             var parentValue: CFTypeRef?
@@ -77,6 +100,25 @@ nonisolated enum AccessibilityElementBoundsResolver {
             currentElement = parentValue as! AXUIElement
         }
         return candidatesFromHitUpward
+    }
+
+    /// On-screen windows, front to back, from the window server. Owner pid and
+    /// bounds are readable without Screen Recording permission.
+    private static func onScreenWindowsFrontToBack() -> [OnScreenWindowInfo] {
+        guard let windowDictionaries = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        return windowDictionaries.compactMap { windowDictionary in
+            guard let ownerProcessIdentifier = windowDictionary[kCGWindowOwnerPID as String] as? Int32,
+                  let boundsDictionary = windowDictionary[kCGWindowBounds as String] as? NSDictionary,
+                  let windowBounds = CGRect(dictionaryRepresentation: boundsDictionary as CFDictionary) else { return nil }
+            let windowAlpha = windowDictionary[kCGWindowAlpha as String] as? Double ?? 1
+            return OnScreenWindowInfo(
+                processIdentifier: ownerProcessIdentifier,
+                boundsInAccessibilitySpace: windowBounds,
+                alpha: windowAlpha
+            )
+        }
     }
 
     private static func makeCandidate(from element: AXUIElement, primaryScreenHeight: CGFloat) -> AccessibilityElementCandidate? {

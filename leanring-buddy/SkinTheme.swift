@@ -37,6 +37,9 @@ nonisolated struct SkinTheme: Equatable {
     let panelHardShadowOffset: Double
     /// Glass card (system glass on macOS 26, frosted material before that).
     let usesGlassPanel: Bool
+    /// The card is light, so the panel's system controls (pickers, text
+    /// fields, switches) are drawn in the light appearance even in dark mode.
+    let isLightPanel: Bool
     let fontDesign: SkinFontDesign
     let companionPrimaryHex: String
     let companionSecondaryHex: String
@@ -64,6 +67,7 @@ nonisolated struct SkinTheme: Equatable {
                 panelBorderWidth: 1,
                 panelHardShadowOffset: 0,
                 usesGlassPanel: true,
+                isLightPanel: false,
                 fontDesign: .rounded,
                 companionPrimaryHex: "#FFB36B",
                 companionSecondaryHex: "#FF6F61",
@@ -87,6 +91,7 @@ nonisolated struct SkinTheme: Equatable {
                 panelBorderWidth: 1,
                 panelHardShadowOffset: 4,
                 usesGlassPanel: false,
+                isLightPanel: true,
                 fontDesign: .monospaced,
                 companionPrimaryHex: "#1A1D1C",
                 companionSecondaryHex: "#FF5A1F",
@@ -110,6 +115,7 @@ nonisolated struct SkinTheme: Equatable {
                 panelBorderWidth: 1,
                 panelHardShadowOffset: 0,
                 usesGlassPanel: true,
+                isLightPanel: true,
                 fontDesign: .serif,
                 companionPrimaryHex: "#1B1535",
                 companionSecondaryHex: "#1B1535",

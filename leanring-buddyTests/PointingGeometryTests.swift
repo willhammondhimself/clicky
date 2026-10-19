@@ -57,6 +57,41 @@ struct PointingGeometryTests {
         #expect(parkingPoint == CGPoint(x: 186, y: 238))
     }
 
+    @Test func bubbleSitsBelowRightOfTheCompanionByDefault() {
+        let bubbleCenter = PointingGeometry.pointingBubbleCenter(
+            companionPoint: CGPoint(x: 186, y: 238),
+            bubbleSize: CGSize(width: 90, height: 22),
+            targetRectInOverlay: CGRect(x: 200, y: 200, width: 80, height: 24)
+        )
+        #expect(bubbleCenter == CGPoint(x: 241, y: 256))
+    }
+
+    @Test func bubbleNeverCoversTheTargetWhenTheCompanionParksAbove() {
+        let overlaySize = CGSize(width: 1512, height: 982)
+        let bubbleSize = CGSize(width: 90, height: 22)
+        // Targets along the bottom edge make the companion flip above them.
+        for targetRect in [CGRect(x: 200, y: 958, width: 80, height: 24), CGRect(x: 0, y: 958, width: 80, height: 24)] {
+            let parkingPoint = PointingGeometry.companionParkingPoint(
+                forTargetRectInOverlay: targetRect,
+                overlaySize: overlaySize,
+                companionRadius: 10,
+                gap: 6
+            )
+            let bubbleCenter = PointingGeometry.pointingBubbleCenter(
+                companionPoint: parkingPoint,
+                bubbleSize: bubbleSize,
+                targetRectInOverlay: targetRect
+            )
+            let bubbleRect = CGRect(
+                x: bubbleCenter.x - bubbleSize.width / 2,
+                y: bubbleCenter.y - bubbleSize.height / 2,
+                width: bubbleSize.width,
+                height: bubbleSize.height
+            )
+            #expect(!bubbleRect.intersects(targetRect), "\(targetRect)")
+        }
+    }
+
     @Test func parkingFlipsToStayOnScreenAtEveryCorner() {
         let overlaySize = CGSize(width: 1512, height: 982)
         let companionRadius: CGFloat = 8

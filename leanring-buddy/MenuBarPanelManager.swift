@@ -55,6 +55,7 @@ final class MenuBarPanelManager: NSObject {
             .removeDuplicates()
             .sink { [weak self] selectedSkin in
                 self?.statusItem?.button?.image = SkinMenuBarIcon.makeTemplateImage(for: selectedSkin)
+                self?.panel?.appearance = Self.panelAppearance(for: selectedSkin)
             }
     }
 
@@ -144,6 +145,7 @@ final class MenuBarPanelManager: NSObject {
         menuBarPanel.titlebarAppearsTransparent = true
 
         menuBarPanel.contentView = hostingView
+        menuBarPanel.appearance = Self.panelAppearance(for: AppSettings.shared.selectedSkin)
         panel = menuBarPanel
     }
 
@@ -211,5 +213,12 @@ final class MenuBarPanelManager: NSObject {
             NSEvent.removeMonitor(monitor)
             clickOutsideMonitor = nil
         }
+    }
+
+    /// Skins have fixed palettes, so the panel's system controls (pickers,
+    /// text fields, switches) use the appearance that matches the card rather
+    /// than following macOS light/dark mode.
+    private static func panelAppearance(for skin: LumenSkin) -> NSAppearance? {
+        NSAppearance(named: SkinTheme.theme(for: skin).isLightPanel ? .aqua : .darkAqua)
     }
 }

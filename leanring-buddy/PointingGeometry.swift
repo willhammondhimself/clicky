@@ -62,4 +62,15 @@ nonisolated enum PointingGeometry {
             y: min(max(parkingY, companionRadius), overlaySize.height - companionRadius)
         )
     }
+
+    /// Where the pointing bubble goes: below-right of the companion, except
+    /// when the companion parked above the target (bottom-edge flip), where
+    /// below would cover the target, so the bubble goes above the companion.
+    static func pointingBubbleCenter(companionPoint: CGPoint, bubbleSize: CGSize, targetRectInOverlay: CGRect?) -> CGPoint {
+        let bubbleCenterX = companionPoint.x + 10 + bubbleSize.width / 2
+        if let targetRectInOverlay, companionPoint.y < targetRectInOverlay.minY {
+            return CGPoint(x: bubbleCenterX, y: companionPoint.y - 14 - bubbleSize.height / 2)
+        }
+        return CGPoint(x: bubbleCenterX, y: companionPoint.y + 18)
+    }
 }
