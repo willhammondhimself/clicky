@@ -3,7 +3,7 @@
 //  leanring-buddy
 //
 //  Pure helpers for Ollama's native HTTP API (/api/tags, /api/pull,
-//  /api/embed, /api/generate): URL derivation, request bodies and response
+//  /api/embed, /api/generate, /api/chat): URL derivation, request bodies and response
 //  parsing. No networking here so the whole file is unit-tested in the
 //  terminal harness; OllamaNativeClient does the URLSession calls.
 //
@@ -55,6 +55,10 @@ nonisolated enum OllamaNativeEndpoints {
 
     static func generateURL(nativeBaseURL: URL) -> URL {
         nativeBaseURL.appendingPathComponent("api/generate")
+    }
+
+    static func chatURL(nativeBaseURL: URL) -> URL {
+        nativeBaseURL.appendingPathComponent("api/chat")
     }
 
     // MARK: - Model names
@@ -110,6 +114,29 @@ nonisolated enum OllamaNativeEndpoints {
         return encodeBody(body)
     }
 
+    /// One screenshot and one question for a vision model on /api/chat, the
+    /// shape precise pointing was benchmarked with: non-streaming, thinking
+    /// off, deterministic, a few tokens out. `num_ctx` 4096 keeps the model's
+    /// resident size down (Ollama's default 32k context made the 4B model 8 GB).
+    static func imageChatRequestBody(
+        modelName: String,
+        systemPrompt: String,
+        userText: String,
+        jpegImageData: Data
+    ) -> Data {
+        encodeBody([
+            "model": modelName,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userText, "images": [jpegImageData.base64EncodedString()]],
+            ],
+            "stream": false,
+            "think": false,
+            "keep_alive": -1,
+            "options": ["temperature": 0, "num_predict": 40, "num_ctx": 4096],
+        ])
+    }
+
     // MARK: - Pull stream
 
     /// One newline-delimited JSON line of the /api/pull stream. Nil for blank
@@ -155,6 +182,16 @@ nonisolated enum OllamaNativeEndpoints {
             throw ResponseError.malformedResponse(description: "generate response has no response field")
         }
         return generatedText
+    }
+
+    static func chatMessageContent(fromChatResponse responseData: Data) throws -> String {
+        let topLevel = try jsonDictionary(from: responseData)
+        try throwIfServerError(topLevel)
+        guard let message = topLevel["message"] as? [String: Any],
+              let messageContent = message["content"] as? String else {
+            throw ResponseError.malformedResponse(description: "chat response has no message content")
+        }
+        return messageContent
     }
 
     // MARK: - Private

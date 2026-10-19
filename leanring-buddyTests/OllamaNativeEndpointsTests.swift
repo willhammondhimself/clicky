@@ -32,6 +32,7 @@ struct OllamaNativeEndpointsTests {
         #expect(OllamaNativeEndpoints.pullURL(nativeBaseURL: nativeBaseURL).absoluteString == "http://127.0.0.1:11434/api/pull")
         #expect(OllamaNativeEndpoints.embedURL(nativeBaseURL: nativeBaseURL).absoluteString == "http://127.0.0.1:11434/api/embed")
         #expect(OllamaNativeEndpoints.generateURL(nativeBaseURL: nativeBaseURL).absoluteString == "http://127.0.0.1:11434/api/generate")
+        #expect(OllamaNativeEndpoints.chatURL(nativeBaseURL: nativeBaseURL).absoluteString == "http://127.0.0.1:11434/api/chat")
     }
 
     // MARK: - Model names
@@ -104,6 +105,51 @@ struct OllamaNativeEndpointsTests {
             includesThinkFlag: false
         ))
         #expect(body["think"] == nil)
+    }
+
+    @Test func imageChatBodyCarriesOneBase64ImageWithDeterministicShortOutput() throws {
+        let jpegImageData = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
+        let body = try jsonObject(from: OllamaNativeEndpoints.imageChatRequestBody(
+            modelName: "qwen3-vl:4b-instruct",
+            systemPrompt: "sys",
+            userText: "point at the element for: save button",
+            jpegImageData: jpegImageData
+        ))
+        #expect(body["model"] as? String == "qwen3-vl:4b-instruct")
+        #expect(body["stream"] as? Bool == false)
+        #expect(body["think"] as? Bool == false)
+        #expect(body["keep_alive"] as? Int == -1)
+
+        let messages = try #require(body["messages"] as? [[String: Any]])
+        #expect(messages.count == 2)
+        #expect(messages[0]["role"] as? String == "system")
+        #expect(messages[0]["content"] as? String == "sys")
+        #expect(messages[0]["images"] == nil)
+        #expect(messages[1]["role"] as? String == "user")
+        #expect(messages[1]["content"] as? String == "point at the element for: save button")
+        #expect(messages[1]["images"] as? [String] == [jpegImageData.base64EncodedString()])
+
+        let options = try #require(body["options"] as? [String: Any])
+        #expect(options["temperature"] as? Int == 0)
+        #expect(options["num_predict"] as? Int == 40)
+        // Ollama's default 32k context made the 4B model 8 GB resident.
+        #expect(options["num_ctx"] as? Int == 4096)
+    }
+
+    @Test func parsesChatMessageContent() throws {
+        let response = Data("""
+        {"model":"qwen3-vl:4b-instruct","created_at":"2026-10-19T12:00:00Z","message":{"role":"assistant","content":"[POINT:512,87]"},"done":true}
+        """.utf8)
+        #expect(try OllamaNativeEndpoints.chatMessageContent(fromChatResponse: response) == "[POINT:512,87]")
+    }
+
+    @Test func chatResponseWithoutMessageContentIsAnError() {
+        #expect(throws: OllamaNativeEndpoints.ResponseError.self) {
+            try OllamaNativeEndpoints.chatMessageContent(fromChatResponse: Data("{\"done\":true}".utf8))
+        }
+        #expect(throws: OllamaNativeEndpoints.ResponseError.serverError(message: "model \"qwen3-vl:4b-instruct\" not found, try pulling it first")) {
+            try OllamaNativeEndpoints.chatMessageContent(fromChatResponse: Data("{\"error\":\"model \\\"qwen3-vl:4b-instruct\\\" not found, try pulling it first\"}".utf8))
+        }
     }
 
     // MARK: - Pull stream
